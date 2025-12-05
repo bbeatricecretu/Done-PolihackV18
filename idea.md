@@ -97,12 +97,55 @@ Feature: A one-tap record button. The user rambles: "I need to buy milk, oh and 
 
 Tech: OpenAI Whisper + GPT-4o. The AI parses that audio into three distinct tasks with implied contexts (Milk = Location: Grocery; Mom = Date: Birthday; Bug = Context: Work).
 
+---
 
+### 6. New Feature Expansions (Based on your feedback)
 
+#### A. The "Archaeologist" (Auto-read from Notes)
+People rarely keep tasks in one place. They are scattered in random notes.
+*   **How it works:** The app connects to sources like **Notion, Obsidian, Google Keep, or Apple Notes**.
+*   **The Logic:** It scans for:
+    *   Unchecked checkboxes `[ ]`.
+    *   Imperative sentences (e.g., "Remember to email John").
+    *   Bullet points in files named "Ideas" or "To-Do".
+*   **The Value:** It centralizes your "mental load" without you having to copy-paste.
 
+#### B. Contextual Batching (The "Errand Runner")
+*Your specific request:* "If I go to the store, show all store tasks."
+*   **The Problem:** You have 5 tasks for "Groceries" but they are scattered in your list. You go to the store for milk and forget the eggs.
+*   **The Solution:**
+    *   **Geofencing:** The app detects you have entered a "Grocery Store" or "Mall" category location.
+    *   **Dynamic Grouping:** It instantly pulls **ALL** tasks tagged with `#shopping` or `#errands` into the "Now" view.
+    *   **Notification:** "Since you are at Lidl, here are the 4 other things you need."
 
-Sters taskuri si modificat taskuri si adaugat 
+#### C. Task Lifecycle (Edit & Delete)
+*   **Swipe Actions:**
+    *   **Swipe Left (Delete):** "I'm never going to do this." -> Gone.
+    *   **Swipe Right (Delegate/Snooze):** "Not now."
+*   **Long Press (Edit):** Quickly fix typos or add details.
+*   **Smart Cleanup:** If a task sits for 30 days untouched, the AI asks: *"Be honest, are you actually going to do this? Or should we delete it?"*
 
-Daca mergi la magazin sa apara toate taskurile cu mers la magazin in notificare.
+---
+
+### 7. Improvements & "Completing the Idea"
+
+To make this a winning project, here are the final polish layers:
+
+#### A. Privacy First (The Trust Layer)
+Since the app reads notifications and notes, privacy is the biggest concern.
+*   **Local-First Processing:** Try to use on-device AI (like Google's Gemini Nano or a small Llama model) for parsing notifications so personal data doesn't leave the phone.
+*   **Transparency:** Explicitly ask: "Allow 'Memento' to read notifications only to find tasks?"
+
+#### B. Energy Level Estimation
+*   **Input:** Integrate with HealthKit / Google Fit.
+*   **Logic:**
+    *   Did the user sleep only 4 hours? -> **Mode:** "Survival Mode" (Only show critical tasks).
+    *   Did the user just finish a workout? -> **Mode:** "High Energy" (Show difficult/creative tasks).
+
+#### C. The "Done" State (Dopamine)
+What happens when the "Now" screen is empty?
+*   Don't just show a blank screen.
+*   Show a "Zen" image or a summary of what was accomplished.
+*   **Message:** "You are free. Go enjoy the world." (Reinforcing the theme).
 
 
