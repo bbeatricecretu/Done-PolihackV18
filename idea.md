@@ -96,3 +96,13 @@ This needs a very specific "prioritization algorithm" to work well.
 Feature: A one-tap record button. The user rambles: "I need to buy milk, oh and call mom for her birthday, and fix that bug in the code."
 
 Tech: OpenAI Whisper + GPT-4o. The AI parses that audio into three distinct tasks with implied contexts (Milk = Location: Grocery; Mom = Date: Birthday; Bug = Context: Work).
+
+
+
+
+
+Sters taskuri si modificat taskuri si adaugat 
+
+Daca mergi la magazin sa apara toate taskurile cu mers la magazin in notificare.
+
+
