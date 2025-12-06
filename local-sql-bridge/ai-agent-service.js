@@ -155,17 +155,25 @@ class AIAgentService {
       const database = this.cosmosClient.database(process.env.COSMOS_DATABASE);
       const container = database.container(process.env.COSMOS_CONTAINER);
 
-      const { resource: notification } = await container.item(notificationId, notificationId).read();
+      // Query to find the notification
+      const query = {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: notificationId }]
+      };
       
-      if (!notification) {
+      const { resources } = await container.items.query(query).fetchAll();
+      
+      if (!resources || resources.length === 0) {
         console.warn(`[AI Agent] Notification ${notificationId} not found, skipping mark as seen`);
         return;
       }
       
+      const notification = resources[0];
       notification.seen_by_agent = true;
       notification.first_seen_at = notification.first_seen_at || new Date().toISOString();
 
-      await container.item(notificationId, notificationId).replace(notification);
+      // Partition key is /polihack
+      await container.item(notification.id, notification.polihack).replace(notification);
       console.log(`[AI Agent] Marked notification ${notificationId} as seen`);
     } catch (error) {
       console.error('[AI Agent] Error marking notification as seen:', error);
@@ -185,16 +193,34 @@ class AIAgentService {
       const database = this.cosmosClient.database(process.env.COSMOS_DATABASE);
       const container = database.container(process.env.COSMOS_CONTAINER);
 
-      const { resource: notification } = await container.item(notificationId, notificationId).read();
+      // Query to find the notification
+      const query = {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: notificationId }]
+      };
       
+      const { resources } = await container.items.query(query).fetchAll();
+      
+      if (!resources || resources.length === 0) {
+        console.log(`[AI Agent] Notification ${notificationId} not found when reading.`);
+        return;
+      }
+      
+      const notification = resources[0];
       notification.processed = true;
       notification.processed_at = new Date().toISOString();
 
-      await container.item(notificationId, notificationId).replace(notification);
-      console.log(`[AI Agent] Marked notification ${notificationId} as processed`);
+      // Partition key is /polihack - use the polihack property value
+      await container.item(notification.id, notification.polihack).replace(notification);
+      console.log(`[AI Agent] ✅ Marked notification ${notificationId} as processed`);
     } catch (error) {
-      console.error('[AI Agent] Error marking notification:', error);
-      throw error;
+      // Handle 404 - notification doesn't exist
+      if (error.code === 404) {
+        console.log(`[AI Agent] Notification ${notificationId} not found (404) during replace.`);
+        return;
+      }
+      console.error('[AI Agent] Error marking notification:', error.message || error);
+      // Don't throw - just log and continue
     }
   }
 
@@ -210,7 +236,23 @@ class AIAgentService {
       const database = this.cosmosClient.database(process.env.COSMOS_DATABASE);
       const container = database.container(process.env.COSMOS_CONTAINER);
 
-      await container.item(notificationId, notificationId).delete();
+      // Query to find the notification
+      const query = {
+        query: "SELECT * FROM c WHERE c.id = @id",
+        parameters: [{ name: "@id", value: notificationId }]
+      };
+      
+      const { resources } = await container.items.query(query).fetchAll();
+      
+      if (!resources || resources.length === 0) {
+        console.log(`[AI Agent] Notification ${notificationId} not found, skipping delete`);
+        return false;
+      }
+      
+      const notification = resources[0];
+      
+      // Partition key is /polihack
+      await container.item(notification.id, notification.polihack).delete();
       console.log(`[AI Agent] Deleted notification ${notificationId}`);
       return true;
     } catch (error) {
@@ -346,6 +388,28 @@ NOTIFICATION ANALYSIS GUIDELINES:
 - System notifications (app updates, battery warnings)
 - News alerts and headlines
 - Generic "Someone sent you a message" without context
+- **Stories or past-tense narration** ("I went to the store", "I bought groceries", "I met with the team")
+- **Casual conversation or chatter** without a future action request
+
+**Detecting NON-actionable stories vs ACTIONABLE tasks:**
+- IGNORE: "I went to the store today and bought milk" (past tense, already done)
+- IGNORE: "Just finished my meeting with the CEO" (completed action)
+- IGNORE: "Someone told me about going to the dentist" (third-party story)
+- IGNORE: "I need to go to the store" (someone else talking about their own needs)
+- IGNORE: "She needs to buy groceries" (third-party needs)
+- IGNORE: "He said he has to call the dentist" (someone else's task)
+- CREATE: "Remind me to buy milk" (explicit request directed at user)
+- CREATE: "You need to go to the store" (task directed at user)
+- CREATE: "Meeting with CEO tomorrow at 10am" (user's future event)
+- CREATE: "Don't forget to call mom" (directive/reminder for user)
+
+**Key indicators of NON-actionable content:**
+- Past tense verbs (went, bought, finished, told, saw)
+- Storytelling language ("today I...", "yesterday...", "just finished...")
+- **Third-party statements** ("I need to...", "she has to...", "he needs to..." in messages FROM others)
+- Someone else's needs or obligations being discussed
+- No direct request or command to the user
+- Descriptive rather than prescriptive
 
 TASK EXTRACTION FORMAT:
 
@@ -355,11 +419,22 @@ When you decide to create a task, call create_task_from_notification() with:
   "description": "Detailed context from notification body",
   "category": "meetings|finance|shopping|communication|health|general",
   "priority": "low|medium|high",
+  "due_date": "ISO 8601 date string (YYYY-MM-DD or full datetime)",
   "source_app": "app package name from notification",
   "notification_id": "notification ID"
 }
 
-**Category Classification:**
+**IMPORTANT: Always extract and include due_date when:**
+- Notification mentions a specific time ("at 8 PM", "tomorrow at 3pm", "by 5:30")
+- Notification mentions a date ("today", "tomorrow", "December 7th", "next Monday")
+- Notification has a deadline ("by end of day", "before noon")
+- Format as ISO 8601: "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DD"
+- Examples:
+  * "Wash dishes today at 8 PM" → due_date: "2025-12-07T20:00:00"
+  * "Meeting tomorrow at 3pm" → due_date: "2025-12-08T15:00:00"
+  * "Dentist appointment Monday" → due_date: "2025-12-09" (next Monday's date)
+
+**Category Classification:****
 - meetings: Appointments, meetings, schedules, events
 - finance: Bills, payments, banking, transactions
 - shopping: Purchases, orders, deliveries, groceries
@@ -519,7 +594,48 @@ DUPLICATE DETECTION EXAMPLES:
 
 Process all notifications now, checking for duplicates first.`;
 
-      // Call Azure AI Foundry REST API
+      // Define MCP tools for function calling
+      const tools = [
+        {
+          type: "function",
+          function: {
+            name: "create_task_from_notification",
+            description: "Create a new task from a notification",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Task title (under 60 chars)" },
+                description: { type: "string", description: "Detailed description" },
+                category: { type: "string", enum: ["meetings", "finance", "shopping", "communication", "health", "general"] },
+                priority: { type: "string", enum: ["low", "medium", "high"] },
+                due_date: { type: "string", description: "ISO 8601 date string (YYYY-MM-DD or full datetime) if task has a deadline" },
+                source_app: { type: "string", description: "Source app package name" },
+                notification_id: { type: "string", description: "Notification ID" }
+              },
+              required: ["title", "category", "priority", "source_app", "notification_id"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "edit_task",
+            description: "Edit an existing task",
+            parameters: {
+              type: "object",
+              properties: {
+                task_id: { type: "string", description: "Task ID to edit" },
+                title: { type: "string", description: "New task title" },
+                description: { type: "string", description: "New description" },
+                priority: { type: "string", enum: ["low", "medium", "high"] }
+              },
+              required: ["task_id"]
+            }
+          }
+        }
+      ];
+
+      // Call Azure AI Foundry REST API with tools
       const fetch = (await import('node-fetch')).default;
       const response = await fetch(`${this.agentEndpoint}/openai/deployments/${this.agentDeploymentName}/chat/completions?api-version=2024-08-01-preview`, {
         method: 'POST',
@@ -538,6 +654,8 @@ Process all notifications now, checking for duplicates first.`;
               content: userPrompt
             }
           ],
+          tools: tools,
+          tool_choice: "auto",
           temperature: 0.7,
           max_tokens: 4000
         })
@@ -550,21 +668,39 @@ Process all notifications now, checking for duplicates first.`;
       }
 
       const agentResponse = await response.json();
-      console.log('[AI Agent] Agent response received');
+      const message = agentResponse.choices?.[0]?.message;
+      
+      console.log('[AI Agent] ========== AGENT RESPONSE ==========');
+      console.log('[AI Agent] Has content:', !!message?.content);
+      console.log('[AI Agent] Has tool_calls:', !!message?.tool_calls);
+      console.log('[AI Agent] Number of tool calls:', message?.tool_calls?.length || 0);
+      
+      if (message?.tool_calls) {
+        console.log('[AI Agent] Tool calls:', JSON.stringify(message.tool_calls, null, 2));
+      } else {
+        console.log('[AI Agent] No tool calls - agent returned text response');
+        if (message?.content) {
+          console.log('[AI Agent] Content preview:', message.content.substring(0, 200) + '...');
+        }
+      }
+      console.log('[AI Agent] =========================================');
 
-      // Parse agent response and execute MCP tool calls
-      const content = agentResponse.choices?.[0]?.message?.content || '';
-      await this.executeToolCallsFromResponse(content, notifications);
-
-      // Mark notifications as seen (they've been processed by the agent once)
-      for (const notification of notifications) {
-        await this.markNotificationSeen(notification.id);
+      // Execute tool calls
+      if (message?.tool_calls && message.tool_calls.length > 0) {
+        await this.executeToolCalls(message.tool_calls);
+      } else {
+        // No tool calls - agent ignored these notifications
+        // Mark them as processed so they won't be reprocessed
+        console.log('[AI Agent] No tool calls returned. Marking ignored notifications as processed.');
+        for (const notification of notifications) {
+          await this.markNotificationProcessed(notification.id);
+        }
       }
 
       // Return processing results
       return {
         processed: notifications.length,
-        agent_response: agentResponse,
+        tool_calls: message?.tool_calls?.length || 0,
         success: true
       };
 
@@ -579,76 +715,133 @@ Process all notifications now, checking for duplicates first.`;
   }
 
   /**
-   * Execute MCP tool calls based on agent's response
+   * Execute tool calls returned by the agent
    */
-  async executeToolCallsFromResponse(responseText, notifications) {
-    console.log('[AI Agent] Parsing agent response for tool calls...');
+  async executeToolCalls(toolCalls) {
+    console.log(`[AI Agent] Executing ${toolCalls.length} tool calls...`);
     
-    // Look for create_task_from_notification calls in the response
-    const createTaskMatches = responseText.matchAll(/create_task_from_notification\(\s*\{([^}]+)\}\s*\)/g);
-    
-    for (const match of createTaskMatches) {
+    for (const toolCall of toolCalls) {
+      const functionName = toolCall.function.name;
+      const args = JSON.parse(toolCall.function.arguments);
+      
+      console.log(`[AI Agent] Calling ${functionName} with:`, args);
+      
       try {
-        // Extract the JSON from the match
-        const jsonStr = '{' + match[1] + '}';
-        // Clean up the JSON (remove comments, fix quotes)
-        const cleanJson = jsonStr
-          .replace(/\/\/.*/g, '') // Remove comments
-          .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-          .replace(/'/g, '"'); // Replace single quotes with double quotes
-        
-        const params = JSON.parse(cleanJson);
-        console.log('[AI Agent] Creating task:', params);
-        
-        // Create task directly in SQL database
-        const request = new sql.Request();
-        const taskId = require('crypto').randomUUID();
-        
-        request.input('id', sql.UniqueIdentifier, taskId);
-        request.input('title', sql.NVarChar(500), params.title);
-        request.input('description', sql.NVarChar(sql.MAX), params.description || '');
-        request.input('category', sql.NVarChar(50), params.category || 'general');
-        request.input('priority', sql.NVarChar(20), params.priority || 'medium');
-        request.input('status', sql.NVarChar(20), 'pending');
-        request.input('source_app', sql.NVarChar(100), params.source_app || '');
-        request.input('source', sql.NVarChar(50), 'notification');
-        request.input('created_at', sql.DateTime2(7), new Date());
-        request.input('updated_at', sql.DateTime2(7), new Date());
-        request.input('is_deleted', sql.Bit, 0);
-
-        await request.query(`
-          INSERT INTO Tasks (
-            id, title, description, category, priority, status,
-            source_app, source, created_at, updated_at, is_deleted,
-            LocationDependent, TimeDependent, WeatherDependent
-          ) VALUES (
-            @id, @title, @description, @category, @priority, @status,
-            @source_app, @source, @created_at, @updated_at, @is_deleted,
-            0, 0, 0
-          )
-        `);
-
-        console.log(`[AI Agent] ✅ Created task: ${params.title}`);
-
-        // Delete the notification after processing
-        if (params.notification_id) {
-          await this.deleteNotification(params.notification_id);
+        switch (functionName) {
+          case 'create_task_from_notification':
+            await this.createTask(args);
+            break;
+          case 'edit_task':
+            await this.editTask(args);
+            break;
+          default:
+            console.warn(`[AI Agent] Unknown function: ${functionName}`);
         }
       } catch (error) {
-        console.error('[AI Agent] Error creating task from agent response:', error);
+        console.error(`[AI Agent] Error executing ${functionName}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Create task in database
+   */
+  async createTask(params) {
+    const request = new sql.Request();
+    const taskId = require('crypto').randomUUID();
+    
+    request.input('id', sql.UniqueIdentifier, taskId);
+    request.input('title', sql.NVarChar(500), params.title);
+    request.input('description', sql.NVarChar(sql.MAX), params.description || '');
+    request.input('category', sql.NVarChar(50), params.category || 'general');
+    request.input('priority', sql.NVarChar(20), params.priority || 'medium');
+    request.input('status', sql.NVarChar(20), 'pending');
+    request.input('source_app', sql.NVarChar(100), params.source_app || '');
+    request.input('source', sql.NVarChar(50), 'notification');
+    request.input('created_at', sql.DateTime2(7), new Date());
+    request.input('updated_at', sql.DateTime2(7), new Date());
+    request.input('is_deleted', sql.Bit, 0);
+    
+    // Handle due_date if provided
+    if (params.due_date) {
+      try {
+        const dueDate = new Date(params.due_date);
+        if (!isNaN(dueDate.getTime())) {
+          request.input('due_date', sql.DateTime2(7), dueDate);
+        }
+      } catch (e) {
+        console.log(`[AI Agent] Invalid due_date: ${params.due_date}`);
       }
     }
 
-    // Also delete any notifications that the agent said to IGNORE/DELETE
-    const deleteMatches = responseText.matchAll(/delete_notification\(\s*id:\s*"([^"]+)"\s*\)/g);
-    for (const match of deleteMatches) {
-      try {
-        const notificationId = match[1];
-        await this.deleteNotification(notificationId);
-        console.log(`[AI Agent] ✅ Deleted notification: ${notificationId}`);
-      } catch (error) {
-        console.error('[AI Agent] Error deleting notification:', error);
-      }
+    const query = params.due_date ? `
+      INSERT INTO Tasks (
+        id, title, description, category, priority, status,
+        source_app, source, created_at, updated_at, is_deleted,
+        LocationDependent, TimeDependent, WeatherDependent, due_date
+      ) VALUES (
+        @id, @title, @description, @category, @priority, @status,
+        @source_app, @source, @created_at, @updated_at, @is_deleted,
+        0, 0, 0, @due_date
+      )
+    ` : `
+      INSERT INTO Tasks (
+        id, title, description, category, priority, status,
+        source_app, source, created_at, updated_at, is_deleted,
+        LocationDependent, TimeDependent, WeatherDependent
+      ) VALUES (
+        @id, @title, @description, @category, @priority, @status,
+        @source_app, @source, @created_at, @updated_at, @is_deleted,
+        0, 0, 0
+      )
+    `;
+
+    await request.query(query);
+
+    console.log(`[AI Agent] ✅ Created task: ${params.title}`);
+    
+    // Mark notification as processed
+    if (params.notification_id) {
+      await this.markNotificationProcessed(params.notification_id);
+    }
+  }
+
+  /**
+   * Edit task in database
+   */
+  async editTask(params) {
+    const request = new sql.Request();
+    
+    request.input('id', sql.UniqueIdentifier, params.task_id);
+    request.input('updated_at', sql.DateTime2(7), new Date());
+    
+    const updates = [];
+    if (params.title) {
+      request.input('title', sql.NVarChar(500), params.title);
+      updates.push('title = @title');
+    }
+    if (params.description) {
+      request.input('description', sql.NVarChar(sql.MAX), params.description);
+      updates.push('description = @description');
+    }
+    if (params.priority) {
+      request.input('priority', sql.NVarChar(20), params.priority);
+      updates.push('priority = @priority');
+    }
+    
+    updates.push('updated_at = @updated_at');
+    
+    await request.query(`
+      UPDATE Tasks 
+      SET ${updates.join(', ')}
+      WHERE id = @id
+    `);
+
+    console.log(`[AI Agent] ✅ Edited task: ${params.task_id}`);
+    
+    // Mark notification as processed
+    if (params.notification_id) {
+      await this.markNotificationProcessed(params.notification_id);
     }
   }
 
@@ -676,7 +869,8 @@ Process all notifications now, checking for duplicates first.`;
       
       let deletedCount = 0;
       for (const notification of resources) {
-        await container.item(notification.id, notification.id).delete();
+        // Partition key is /polihack
+        await container.item(notification.id, notification.polihack).delete();
         deletedCount++;
       }
 
