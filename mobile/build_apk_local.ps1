@@ -3,7 +3,8 @@ Write-Host "Building Debug APK..." -ForegroundColor Cyan
 
 # 0. Set JAVA_HOME to Microsoft OpenJDK 17
 $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.9.8-hotspot"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+# Add Node.js to PATH as well
+$env:Path = "C:\Program Files\nodejs;$env:JAVA_HOME\bin;$env:Path"
 Write-Host "Using JAVA_HOME: $env:JAVA_HOME" -ForegroundColor Gray
 
 # 1. Set Android Home (Common path on Windows)
