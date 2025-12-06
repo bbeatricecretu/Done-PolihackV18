@@ -203,7 +203,7 @@ export function FilterTasksModal({
                 )}
 
                 {renderDropdown(
-                  'Get From',
+                  'Source',
                   'source',
                   availableSources,
                   filters.source,

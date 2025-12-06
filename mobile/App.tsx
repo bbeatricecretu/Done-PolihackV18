@@ -11,10 +11,47 @@ import { notificationListener } from './src/services/NotificationListener';
 import { DevConsoleModal } from './src/components/DevConsoleModal';
 import { Terminal } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
+import { Task } from './src/types';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings'>('home');
   const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([
+    { id: 1, title: 'Review meeting notes', description: 'From yesterday\'s team sync', completed: false, dueDate: 'Due in 2 days', date: 'Dec 8', category: 'Work', priority: 'High', source: 'Email' },
+    { id: 2, title: 'Buy groceries', description: 'Milk, eggs, bread', completed: false, date: 'Dec 7', category: 'Personal', priority: 'Medium', source: 'Apps' },
+    { id: 4, title: 'Read book chapter', description: 'Chapter 5 - Productivity', completed: false, dueDate: 'Due in 4 days', date: 'Dec 10', category: 'Personal', priority: 'Low', source: 'Apps' },
+    { id: 5, title: 'Gym session', description: 'Leg day workout', completed: false, date: 'Dec 6', category: 'Social', priority: 'Medium', source: 'WhatsApp' },
+    { id: 6, title: 'Pay bills', description: 'Monthly utilities payment', completed: false, date: 'Dec 9', category: 'Finance', priority: 'High', source: 'Email' },
+  ]);
+
+  const toggleTask = (id: number) => {
+    setTasks(tasks.map(task => 
+      task.id === id ? { ...task, completed: !task.completed } : task
+    ));
+  };
+
+  const addTask = (newTask: Task) => {
+    setTasks([newTask, ...tasks]);
+  };
+
+  const deleteTask = (id: number) => {
+    Alert.alert(
+      "Delete Task",
+      "Are you sure you want to delete this note?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: () => setTasks(tasks.filter(t => t.id !== id))
+        }
+      ]
+    );
+  };
+
+  const editTask = (editedTask: Task) => {
+    setTasks(tasks.map(t => t.id === editedTask.id ? editedTask : t));
+  };
 
   // Initialize notification listener on app start
   useEffect(() => {
@@ -55,15 +92,33 @@ export default function App() {
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <HomePage onNavigate={(page) => setCurrentPage(page)} />;
+        return <HomePage 
+          onNavigate={(page) => setCurrentPage(page)} 
+          tasks={tasks}
+          onToggleTask={toggleTask}
+          onDeleteTask={deleteTask}
+          onEditTask={editTask}
+        />;
       case 'chat':
         return <ChatBoxPage />;
       case 'tasks':
-        return <TasksPage />;
+        return <TasksPage 
+          tasks={tasks}
+          onToggleTask={toggleTask}
+          onAddTask={addTask}
+          onDeleteTask={deleteTask}
+          onEditTask={editTask}
+        />;
       case 'settings':
         return <SettingsPage />;
       default:
-        return <HomePage />;
+        return <HomePage 
+          onNavigate={(page) => setCurrentPage(page)} 
+          tasks={tasks}
+          onToggleTask={toggleTask}
+          onDeleteTask={deleteTask}
+          onEditTask={editTask}
+        />;
     }
   };
 
