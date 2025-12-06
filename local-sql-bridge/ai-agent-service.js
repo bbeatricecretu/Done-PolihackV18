@@ -381,35 +381,52 @@ IMPORTANT PRIORITY ORDER:
 
 NOTIFICATION ANALYSIS GUIDELINES:
 
+**CRITICAL: Most notifications should be IGNORED. Only create tasks for EXPLICIT, DIRECT action requests.**
+
 **Always ignore these types:**
 - Social media notifications (likes, comments, follows)
 - Promotional messages and ads
-- Chat messages without actionable content
+- **Chat messages without EXPLICIT actionable content**
+- **Unread message counters** ("X unread messages", "Y new messages")
+- **Questions from others** (someone asking YOU something - not your task to do)
 - System notifications (app updates, battery warnings)
 - News alerts and headlines
 - Generic "Someone sent you a message" without context
 - **Stories or past-tense narration** ("I went to the store", "I bought groceries", "I met with the team")
 - **Casual conversation or chatter** without a future action request
+- **Informational messages** (status updates, FYI, sharing information)
 
-**Detecting NON-actionable stories vs ACTIONABLE tasks:**
+**Examples of what to IGNORE:**
+- IGNORE: "49 messages from 2 chats" (message counter)
+- IGNORE: "X unread messages" (notification badge)
+- IGNORE: "Pana la ce ora se pot incarca maine prezentările?" (someone asking you a question - they need to find out, not you)
+- IGNORE: "When is the deadline?" (question, not a task)
 - IGNORE: "I went to the store today and bought milk" (past tense, already done)
 - IGNORE: "Just finished my meeting with the CEO" (completed action)
 - IGNORE: "Someone told me about going to the dentist" (third-party story)
 - IGNORE: "I need to go to the store" (someone else talking about their own needs)
 - IGNORE: "She needs to buy groceries" (third-party needs)
 - IGNORE: "He said he has to call the dentist" (someone else's task)
+
+**Examples of what to CREATE:**
 - CREATE: "Remind me to buy milk" (explicit request directed at user)
 - CREATE: "You need to go to the store" (task directed at user)
 - CREATE: "Meeting with CEO tomorrow at 10am" (user's future event)
 - CREATE: "Don't forget to call mom" (directive/reminder for user)
+- CREATE: "Clean the toilet tomorrow night" (explicit task with deadline)
+- CREATE: "Submit the presentation by Friday" (direct action with deadline)
 
 **Key indicators of NON-actionable content:**
 - Past tense verbs (went, bought, finished, told, saw)
 - Storytelling language ("today I...", "yesterday...", "just finished...")
 - **Third-party statements** ("I need to...", "she has to...", "he needs to..." in messages FROM others)
+- **Questions from others** (they're asking you for information, not assigning you a task)
 - Someone else's needs or obligations being discussed
 - No direct request or command to the user
 - Descriptive rather than prescriptive
+- Message counters or unread badges
+
+**IMPORTANT: If you're not 100% sure it's a direct, actionable task for the user, IGNORE it.**
 
 TASK EXTRACTION FORMAT:
 
