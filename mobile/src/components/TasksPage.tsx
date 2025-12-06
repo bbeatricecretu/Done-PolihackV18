@@ -1,35 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Plus, Search, Check, X, ListFilter } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NewMementoModal } from './NewMementoModal';
+import { EditTaskModal } from './EditTaskModal';
 import { FilterTasksModal, FilterState } from './FilterTasksModal';
+import { Task } from '../types';
 
-interface Task {
-  id: number;
-  title: string;
-  description: string;
-  completed: boolean;
-  dueDate?: string;
-  date: string;
-  category?: string;
-  priority?: string;
-  source?: string;
+interface TasksPageProps {
+  tasks: Task[];
+  onToggleTask: (id: number) => void;
+  onAddTask: (task: Task) => void;
+  onDeleteTask: (id: number) => void;
+  onEditTask: (task: Task) => void;
 }
 
-export function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, title: 'Review meeting notes', description: 'From yesterday\'s team sync', completed: false, dueDate: 'Due in 2 days', date: 'Dec 8', category: 'Work', priority: 'High', source: 'Email' },
-    { id: 2, title: 'Buy groceries', description: 'Milk, eggs, bread', completed: false, date: 'Dec 7', category: 'Personal', priority: 'Medium', source: 'Apps' },
-    { id: 4, title: 'Read book chapter', description: 'Chapter 5 - Productivity', completed: false, dueDate: 'Due in 4 days', date: 'Dec 10', category: 'Personal', priority: 'Low', source: 'Apps' },
-    { id: 5, title: 'Gym session', description: 'Leg day workout', completed: false, date: 'Dec 6', category: 'Social', priority: 'Medium', source: 'WhatsApp' },
-    { id: 6, title: 'Pay bills', description: 'Monthly utilities payment', completed: false, date: 'Dec 9', category: 'Finance', priority: 'High', source: 'Email' },
-  ]);
-
+export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEditTask }: TasksPageProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const [activeFilters, setActiveFilters] = useState<FilterState>({
     category: null,
     source: null,
@@ -37,14 +29,21 @@ export function TasksPage() {
     status: null,
   });
 
-  const toggleTask = (id: number) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+  const handleAddTask = (newTask: Task) => {
+    onAddTask(newTask);
   };
 
-  const handleAddTask = (newTask: Task) => {
-    setTasks([newTask, ...tasks]);
+  const handleEdit = (task: Task) => {
+    setEditingTask(task);
+  };
+
+  const handleSaveEdit = (editedTask: Task) => {
+    onEditTask(editedTask);
+    setEditingTask(null);
+  };
+
+  const toggleExpand = (id: number) => {
+    setExpandedTaskId(expandedTaskId === id ? null : id);
   };
 
   // Extract unique values for filters
@@ -108,37 +107,68 @@ export function TasksPage() {
     return result;
   }, [tasks, searchQuery, activeFilters]);
 
-  const renderItem = ({ item }: { item: Task }) => (
-    <TouchableOpacity 
-      style={styles.taskCard}
-      onPress={() => toggleTask(item.id)}
-    >
-      <View style={styles.taskHeader}>
-        <View style={styles.taskContent}>
+  const renderItem = ({ item }: { item: Task }) => {
+    const isExpanded = expandedTaskId === item.id;
+
+    return (
+      <TouchableOpacity 
+        style={styles.taskCard} 
+        onPress={() => toggleExpand(item.id)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.cardHeader}>
           <Text style={styles.taskTitle}>{item.title}</Text>
-          <Text style={styles.taskDescription}>{item.description}</Text>
-          
-          <View style={styles.tagsContainer}>
-            {item.category && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{item.category}</Text>
-              </View>
-            )}
+          <Text style={styles.timeText}>{item.date}</Text>
+        </View>
+
+        <Text style={styles.taskDescription}>{item.description}</Text>
+        
+        <View style={styles.cardFooter}>
+          <View style={styles.metaContainer}>
+            <View style={styles.tagsRow}>
+              {item.category && (
+                <View style={[styles.tag, styles.tagBlue]}>
+                  <Text style={[styles.tagText, styles.tagTextBlue]}>#{item.category}</Text>
+                </View>
+              )}
+              {item.source && (
+                <View style={[styles.tag, styles.tagGreen]}>
+                  <Text style={[styles.tagText, styles.tagTextGreen]}>from {item.source}</Text>
+                </View>
+              )}
+            </View>
             {item.dueDate && (
-              <>
-                <Text style={styles.dot}>•</Text>
-                <Text style={styles.dueText}>{item.dueDate}</Text>
-              </>
+              <Text style={styles.dueText}>{item.dueDate}</Text>
             )}
           </View>
+          
+          <TouchableOpacity onPress={() => onToggleTask(item.id)}>
+            <LinearGradient
+              colors={item.completed ? ['#1f2937', '#1f2937'] : ['#e0f2fe', '#f3e8ff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.doneButton}
+            >
+              <Text style={[styles.doneButtonText, item.completed && styles.doneButtonTextCompleted]}>
+                {item.completed ? 'Completed' : 'Done'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
-        
-        <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
-          {item.completed && <Check size={16} color="white" />}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+
+        {isExpanded && (
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity onPress={() => handleEdit(item)}>
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onDeleteTask(item.id)}>
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -220,6 +250,15 @@ export function TasksPage() {
         availableSources={availableSources}
         availableDates={availableDates}
       />
+
+      <EditTaskModal
+        visible={!!editingTask}
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleSaveEdit}
+        availableCategories={availableCategories}
+        availableSources={availableSources}
+      />
     </View>
   );
 }
@@ -300,69 +339,108 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     backgroundColor: 'white',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1f2937',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 0,
+    elevation: 4,
   },
-  taskHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  taskContent: {
-    flex: 1,
-    marginRight: 16,
+    marginBottom: 8,
   },
   taskTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 16,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#6b7280',
   },
   taskDescription: {
     fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 12,
+    color: '#4b5563',
+    marginBottom: 24,
   },
-  tagsContainer: {
+  cardFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  metaContainer: {
+    flex: 1,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
   },
   tag: {
-    backgroundColor: '#f0fdfa',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 8,
+  },
+  tagBlue: {
+    backgroundColor: '#e0f2fe', // sky-100
+  },
+  tagGreen: {
+    backgroundColor: '#dcfce7', // green-100
   },
   tagText: {
     fontSize: 12,
-    color: '#0d9488',
+    fontWeight: '500',
   },
-  dot: {
-    marginHorizontal: 8,
-    color: '#9ca3af',
-    fontSize: 12,
+  tagTextBlue: {
+    color: '#0369a1', // sky-700
+  },
+  tagTextGreen: {
+    color: '#15803d', // green-700
   },
   dueText: {
-    fontSize: 12,
-    color: '#fb7185',
+    fontSize: 14,
+    color: '#1f2937',
   },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    alignItems: 'center',
-    justifyContent: 'center',
+  doneButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#1f2937',
   },
-  checkboxChecked: {
-    backgroundColor: '#10b981', // emerald-500
-    borderColor: '#10b981',
+  doneButtonCompleted: {
+    backgroundColor: '#1f2937',
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  doneButtonTextCompleted: {
+    color: 'white',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 24,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    textDecorationLine: 'underline',
   },
 });

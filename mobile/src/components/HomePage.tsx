@@ -1,14 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { Plus, Settings } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Task } from '../types';
+import { EditTaskModal } from './EditTaskModal';
 
 const { width } = Dimensions.get('window');
 
 interface HomePageProps {
   onNavigate: (page: 'settings') => void;
+  tasks?: Task[];
+  onToggleTask?: (id: number) => void;
+  onDeleteTask?: (id: number) => void;
+  onEditTask?: (task: Task) => void;
 }
 
-export function HomePage({ onNavigate }: HomePageProps) {
+export function HomePage({ onNavigate, tasks = [], onToggleTask, onDeleteTask, onEditTask }: HomePageProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Get the first incomplete task to show as "Let's do"
+  const focusTask = tasks.find(t => !t.completed);
+
+  const handleEdit = () => {
+    if (focusTask) {
+      setEditingTask(focusTask);
+    }
+  };
+
+  const handleSaveEdit = (editedTask: Task) => {
+    if (onEditTask) {
+      onEditTask(editedTask);
+    }
+    setEditingTask(null);
+  };
+
+  const availableCategories = Array.from(new Set(tasks.map(t => t.category).filter(Boolean))) as string[];
+  const availableSources = Array.from(new Set(tasks.map(t => t.source).filter(Boolean))) as string[];
+
   return (
     <View style={styles.container}>
       {/* Animated mesh gradient background simulation */}
@@ -38,31 +67,79 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Let's do</Text>
           
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Review meeting notes</Text>
-              <Text style={styles.timeText}>10:00 AM</Text>
-            </View>
-            
-            <Text style={styles.cardDescription}>
-              Review the notes from yesterday's team sync regarding the Q4 roadmap.
-            </Text>
-            
-            <View style={styles.cardFooter}>
-              <View style={styles.metaContainer}>
-                <View style={styles.tag}>
-                  <Text style={styles.tagText}>#Work</Text>
-                </View>
-                <Text style={styles.dueText}>Due in 2 days</Text>
+          {focusTask ? (
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => setIsExpanded(!isExpanded)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{focusTask.title}</Text>
+                <Text style={styles.timeText}>{focusTask.date}</Text>
               </View>
               
-              <TouchableOpacity style={styles.doneButton}>
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
+              <Text style={styles.cardDescription}>
+                {focusTask.description}
+              </Text>
+              
+              <View style={styles.cardFooter}>
+                <View style={styles.metaContainer}>
+                  <View style={styles.tagsRow}>
+                    {focusTask.category && (
+                      <View style={[styles.tag, styles.tagBlue]}>
+                        <Text style={[styles.tagText, styles.tagTextBlue]}>#{focusTask.category}</Text>
+                      </View>
+                    )}
+                    {focusTask.source && (
+                      <View style={[styles.tag, styles.tagGreen]}>
+                        <Text style={[styles.tagText, styles.tagTextGreen]}>from {focusTask.source}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {focusTask.dueDate && (
+                    <Text style={styles.dueText}>{focusTask.dueDate}</Text>
+                  )}
+                </View>
+                
+                <TouchableOpacity onPress={() => onToggleTask && onToggleTask(focusTask.id)}>
+                  <LinearGradient
+                    colors={['#e0f2fe', '#f3e8ff']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.doneButton}
+                  >
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              {isExpanded && (
+                <View style={styles.actionsContainer}>
+                  <TouchableOpacity onPress={handleEdit}>
+                    <Text style={styles.actionText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => onDeleteTask && onDeleteTask(focusTask.id)}>
+                    <Text style={styles.actionText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardDescription}>All caught up! 🎉</Text>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
+
+      <EditTaskModal
+        visible={!!editingTask}
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleSaveEdit}
+        availableCategories={availableCategories}
+        availableSources={availableSources}
+      />
     </View>
   );
 }
@@ -193,14 +270,32 @@ const styles = StyleSheet.create({
   metaContainer: {
     flex: 1,
   },
-  tag: {
-    alignSelf: 'flex-start',
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 4,
   },
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tagBlue: {
+    backgroundColor: '#e0f2fe', // sky-100
+  },
+  tagGreen: {
+    backgroundColor: '#dcfce7', // green-100
+  },
   tagText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
-    color: '#1f2937',
+  },
+  tagTextBlue: {
+    color: '#0369a1', // sky-700
+  },
+  tagTextGreen: {
+    color: '#15803d', // green-700
   },
   dueText: {
     fontSize: 14,
@@ -218,5 +313,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 24,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    textDecorationLine: 'underline',
   },
 });
