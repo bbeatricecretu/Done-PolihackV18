@@ -47,12 +47,10 @@ export class NotificationListener {
       }
 
       if (finalStatus !== 'granted') {
-        console.log('[NotificationListener] Permission denied');
         DevLogger.log('[NotificationListener] Permission denied');
         return false;
       }
 
-      console.log('[NotificationListener] Permissions granted');
       DevLogger.log('[NotificationListener] Permissions granted');
 
       // Start listening to notifications
@@ -60,7 +58,6 @@ export class NotificationListener {
       return true;
 
     } catch (error) {
-      console.error('[NotificationListener] Initialization failed:', error);
       DevLogger.log('[NotificationListener] Initialization failed', error);
       return false;
     }
@@ -80,7 +77,6 @@ export class NotificationListener {
     );
 
     this.isListening = true;
-    console.log('[NotificationListener] Started listening');
     DevLogger.log('[NotificationListener] Started listening');
   }
 
@@ -92,7 +88,6 @@ export class NotificationListener {
       this.subscription.remove();
       this.subscription = null;
       this.isListening = false;
-      console.log('[NotificationListener] Stopped listening');
       DevLogger.log('[NotificationListener] Stopped listening');
     }
   }
