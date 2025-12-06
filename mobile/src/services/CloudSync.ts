@@ -26,6 +26,27 @@ async function getCloudId(localId: number): Promise<string> {
   return idMap[localId];
 }
 
+function parseDueDate(dueDate?: string): string | null {
+  if (!dueDate) return null;
+  
+  // Check if it's already in ISO format
+  if (dueDate.includes('T') || dueDate.includes('-')) {
+    return new Date(dueDate).toISOString();
+  }
+  
+  // Parse DD/MM/YYYY format
+  const parts = dueDate.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    const date = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00.000Z`);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+  
+  return null;
+}
+
 function mapTaskToCloud(task: Task, cloudId: string) {
   return {
     id: cloudId,
@@ -34,7 +55,8 @@ function mapTaskToCloud(task: Task, cloudId: string) {
     category: task.category?.toLowerCase() || 'general',
     priority: task.priority?.toLowerCase() || 'medium',
     status: task.completed ? 'completed' : 'pending',
-    due_date: task.dueDate ? new Date().toISOString() : null,
+    completed_at: task.completed ? (task.completedAt || new Date().toISOString()) : null,
+    due_date: parseDueDate(task.dueDate),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     source: task.source?.toLowerCase() === 'notification' ? 'notification' : 'manual',
@@ -48,6 +70,8 @@ export async function createTaskInCloud(task: Task) {
     const cloudId = await getCloudId(task.id);
     const cloudTask = mapTaskToCloud(task, cloudId);
     
+    console.log('[CloudSync] Creating task:', { title: task.title, cloudId, dueDate: task.dueDate });
+    
     const response = await fetch(`${API_BASE}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -58,7 +82,7 @@ export async function createTaskInCloud(task: Task) {
       const errorText = await response.text();
       console.error('[CloudSync] Create failed (Server):', errorText);
     } else {
-      console.log('[CloudSync] Created task:', cloudId);
+      console.log('[CloudSync] Created task successfully:', cloudId);
     }
   } catch (e) {
     console.error('[CloudSync] Create failed (Network):', e);

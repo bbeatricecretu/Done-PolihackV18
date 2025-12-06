@@ -8,4 +8,5 @@ export interface Task {
   category?: string;
   priority?: string;
   source?: string;
+  completedAt?: string;
 }

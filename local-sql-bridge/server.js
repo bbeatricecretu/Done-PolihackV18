@@ -130,6 +130,7 @@ app.get('/api/tasks', async (req, res) => {
 app.post('/api/tasks', async (req, res) => {
   const task = req.body;
   console.log('Creating task:', task.title);
+  console.log('Due date received:', task.due_date);
 
   try {
     const request = new sql.Request();
@@ -145,7 +146,18 @@ app.post('/api/tasks', async (req, res) => {
     
     request.input('priority', sql.NVarChar(20), task.priority);
     request.input('status', sql.NVarChar(20), task.status);
-    request.input('due_date', sql.DateTime2(7), task.due_date ? new Date(task.due_date) : null);
+    request.input('completed_at', sql.DateTime2(7), task.completed_at ? new Date(task.completed_at) : null);
+    
+    // Parse due_date with validation
+    let dueDate = null;
+    if (task.due_date) {
+      const parsedDate = new Date(task.due_date);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ success: false, error: `Validation failed for parameter 'due_date'. Invalid date.` });
+      }
+      dueDate = parsedDate;
+    }
+    request.input('due_date', sql.DateTime2(7), dueDate);
     request.input('created_at', sql.DateTime2(7), new Date(task.created_at));
     request.input('updated_at', sql.DateTime2(7), new Date(task.updated_at));
     request.input('source', sql.NVarChar(50), task.source);
@@ -157,11 +169,11 @@ app.post('/api/tasks', async (req, res) => {
 
     await request.query(`
         INSERT INTO Tasks (
-            id, title, description, category, priority, status, 
+            id, title, description, category, priority, status, completed_at,
             due_date, created_at, updated_at, source, source_app, is_deleted,
             LocationDependent, TimeDependent, WeatherDependent
         ) VALUES (
-            @id, @title, @description, @category, @priority, @status, 
+            @id, @title, @description, @category, @priority, @status, @completed_at,
             @due_date, @created_at, @updated_at, @source, @source_app, @is_deleted,
             @LocationDependent, @TimeDependent, @WeatherDependent
         )
@@ -194,6 +206,7 @@ app.put('/api/tasks/:id', async (req, res) => {
 
     request.input('priority', sql.NVarChar(20), task.priority);
     request.input('status', sql.NVarChar(20), task.status);
+    request.input('completed_at', sql.DateTime2(7), task.completed_at ? new Date(task.completed_at) : null);
     request.input('due_date', sql.DateTime2(7), task.due_date ? new Date(task.due_date) : null);
     request.input('updated_at', sql.DateTime2(7), new Date());
     request.input('is_deleted', sql.Bit, task.is_deleted ? 1 : 0);
@@ -205,6 +218,7 @@ app.put('/api/tasks/:id', async (req, res) => {
             category = @category,
             priority = @priority,
             status = @status,
+            completed_at = @completed_at,
             due_date = @due_date,
             updated_at = @updated_at,
             is_deleted = @is_deleted

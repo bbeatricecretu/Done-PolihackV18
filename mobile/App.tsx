@@ -72,7 +72,12 @@ export default function App() {
   const toggleTask = async (id: number) => {
     const taskToUpdate = tasks.find(t => t.id === id);
     if (taskToUpdate) {
-      const updatedTask = { ...taskToUpdate, completed: !taskToUpdate.completed };
+      const isCompleted = !taskToUpdate.completed;
+      const updatedTask = { 
+        ...taskToUpdate, 
+        completed: isCompleted,
+        completedAt: isCompleted ? new Date().toISOString() : undefined
+      };
       setTasks(tasks.map(task => task.id === id ? updatedTask : task));
       await TaskManager.updateTask(updatedTask);
     }
