@@ -1,10 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, Modal, TouchableWithoutFeedback, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, Modal, TouchableWithoutFeedback, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Plus, Check, ChevronDown, ChevronUp, X, Map as MapIcon, Locate, Type, Save } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Task, SavedLocation } from '../types';
 import { LinearGradient } from 'expo-linear-gradient';
+
+// Error boundary for MapView to catch crashes
+interface MapErrorBoundaryState {
+  hasError: boolean;
+}
+
+class MapErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, MapErrorBoundaryState> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(_: Error): MapErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.log('Map Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }}>
+          <MapIcon size={48} color="#9ca3af" />
+          <Text style={{ marginTop: 12, color: '#6b7280', textAlign: 'center' }}>Map unavailable</Text>
+          <Text style={{ marginTop: 4, color: '#9ca3af', fontSize: 12, textAlign: 'center' }}>Use manual coordinates instead</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface LocationsPageProps {
   tasks: Task[];
@@ -239,14 +272,16 @@ function MapPickerModal({ visible, initialRegion, onClose, onConfirm }: MapPicke
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1 }}>
-        <MapView
-          provider={PROVIDER_GOOGLE}
-          style={{ flex: 1 }}
-          initialRegion={region}
-          onRegionChangeComplete={setRegion}
-        >
-          <Marker coordinate={region} />
-        </MapView>
+        <MapErrorBoundary>
+          <MapView
+            provider={PROVIDER_GOOGLE}
+            style={{ flex: 1 }}
+            initialRegion={region}
+            onRegionChangeComplete={setRegion}
+          >
+            <Marker coordinate={region} />
+          </MapView>
+        </MapErrorBoundary>
         <View style={styles.mapPickerOverlay}>
           <Text style={styles.mapPickerText}>Drag map to position marker</Text>
           <View style={styles.mapPickerButtons}>
@@ -492,37 +527,40 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
 
         {/* Map */}
         <View style={styles.mapContainer}>
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              latitude: userLocation?.coords.latitude || 46.7712,
-              longitude: userLocation?.coords.longitude || 23.6236,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-          >
-            {userLocation && (
-              <Marker
-                coordinate={{
-                  latitude: userLocation.coords.latitude,
-                  longitude: userLocation.coords.longitude,
-                }}
-                title="You are here"
-              />
-            )}
-            {savedLocations.map(loc => (
-              loc.latitude && loc.longitude ? (
+          <MapErrorBoundary>
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              initialRegion={{
+                latitude: userLocation?.coords.latitude || 46.7712,
+                longitude: userLocation?.coords.longitude || 23.6236,
+                latitudeDelta: 0.0922,
+                longitudeDelta: 0.0421,
+              }}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+            >
+              {userLocation && (
                 <Marker
-                  key={loc.id}
-                  coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
-                  title={loc.name}
-                  description={loc.address}
+                  coordinate={{
+                    latitude: userLocation.coords.latitude,
+                    longitude: userLocation.coords.longitude,
+                  }}
+                  title="You are here"
                 />
-              ) : null
-            ))}
-          </MapView>
+              )}
+              {savedLocations.map(loc => (
+                loc.latitude && loc.longitude ? (
+                  <Marker
+                    key={loc.id}
+                    coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
+                    title={loc.name}
+                    description={loc.address}
+                  />
+                ) : null
+              ))}
+            </MapView>
+          </MapErrorBoundary>
         </View>
       </ScrollView>
 

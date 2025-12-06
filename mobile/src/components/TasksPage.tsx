@@ -98,8 +98,6 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
         result = result.filter(t => !t.completed);
     } else if (activeFilters.status === 'all') {
         // Show all tasks (no filtering)
-    }
-    
     } else {
       // Default behavior (status === null): show only incomplete tasks
       result = result.filter(t => !t.completed);

@@ -138,7 +138,6 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
       setTasks(cloudTasks);
     }
   };
-  };
 
   // Initialize notification listener on app start
   useEffect(() => {
