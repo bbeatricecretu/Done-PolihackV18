@@ -21,7 +21,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.memento.app",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "BIND_NOTIFICATION_LISTENER_SERVICE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
