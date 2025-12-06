@@ -213,7 +213,7 @@ export function FilterTasksModal({
                 {renderCalendar()}
 
                 {renderDropdown(
-                  'Done Tasks',
+                  'Status',
                   'status',
                   ['All', 'Completed', 'In Progress'],
                   filters.status ? (filters.status === 'in-progress' ? 'In Progress' : filters.status.charAt(0).toUpperCase() + filters.status.slice(1)) : null,

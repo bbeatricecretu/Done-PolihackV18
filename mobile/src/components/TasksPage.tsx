@@ -240,6 +240,7 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
         onAdd={handleAddTask}
+        availableCategories={availableCategories}
       />
 
       <FilterTasksModal
