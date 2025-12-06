@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { Plus, Settings } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-export function HomePage() {
+interface HomePageProps {
+  onNavigate: (page: 'settings') => void;
+}
+
+export function HomePage({ onNavigate }: HomePageProps) {
   return (
     <View style={styles.container}>
       {/* Animated mesh gradient background simulation */}
@@ -15,41 +19,48 @@ export function HomePage() {
         <View style={[styles.orb, styles.orb4]} />
       </View>
 
-      {/* Content */}
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Memento</Text>
-          <Text style={styles.subtitle}>Your memories, organized</Text>
+          <View style={styles.headerTop}>
+            <Text style={styles.greeting}>Hello,</Text>
+            <TouchableOpacity 
+              onPress={() => onNavigate('settings')}
+              style={styles.settingsButton}
+            >
+              <Settings size={24} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.dateDisplay}>6 Dec</Text>
         </View>
 
-        {/* Add new memento button */}
-        <View style={styles.addButtonContainer}>
-          <TouchableOpacity style={styles.addButton}>
-            <Plus size={24} color="#a78bfa" />
-            <Text style={styles.addButtonText}>Add New Memento</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Single recent memento */}
-        <View style={styles.recentContainer}>
-          <Text style={styles.sectionTitle}>Recent</Text>
-          <TouchableOpacity style={styles.card}>
+        {/* Tasks Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Let's do</Text>
+          
+          <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Review meeting notes</Text>
-                <Text style={styles.cardDescription}>From yesterday's team sync</Text>
-                <View style={styles.tagsContainer}>
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>Work</Text>
-                  </View>
-                  <Text style={styles.dot}>•</Text>
-                  <Text style={styles.dueText}>Due in 2 days</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>Review meeting notes</Text>
+              <Text style={styles.timeText}>10:00 AM</Text>
             </View>
-            <Text style={styles.timeText}>2 hours ago</Text>
-          </TouchableOpacity>
+            
+            <Text style={styles.cardDescription}>
+              Review the notes from yesterday's team sync regarding the Q4 roadmap.
+            </Text>
+            
+            <View style={styles.cardFooter}>
+              <View style={styles.metaContainer}>
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>#Work</Text>
+                </View>
+                <Text style={styles.dueText}>Due in 2 days</Text>
+              </View>
+              
+              <TouchableOpacity style={styles.doneButton}>
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -101,108 +112,111 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 60,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1f2937', // gray-800
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280', // gray-500
-  },
-  addButtonContainer: {
-    alignItems: 'center',
     marginBottom: 48,
   },
-  addButton: {
+  headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  addButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '600',
+  greeting: {
+    fontSize: 48,
+    fontWeight: '300',
     color: '#1f2937',
+    fontFamily: 'System', // Trying to get a lighter, cleaner look
+    marginBottom: 8,
   },
-  recentContainer: {
+  dateDisplay: {
+    fontSize: 56,
+    fontWeight: '400',
+    color: '#1f2937',
+    fontFamily: 'System',
+  },
+  settingsButton: {
+    padding: 8,
+    marginTop: 8,
+  },
+  sectionContainer: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '400',
     color: '#1f2937',
     marginBottom: 16,
+    fontFamily: 'System',
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'white',
     borderRadius: 24,
     padding: 20,
+    borderWidth: 1,
+    borderColor: '#1f2937', // Adding a border to match the sketch style
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 4, height: 4 }, // Offset shadow for sketch feel
+    shadowOpacity: 0.1,
+    shadowRadius: 0,
+    elevation: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  cardContent: {
-    flex: 1,
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 8,
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 12,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tag: {
-    backgroundColor: '#f0fdfa', // teal-50
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#0d9488', // teal-600
-  },
-  dot: {
-    marginHorizontal: 8,
-    color: '#9ca3af',
-    fontSize: 12,
-  },
-  dueText: {
-    fontSize: 12,
-    color: '#fb7185', // rose-400
+    flex: 1,
+    marginRight: 16,
   },
   timeText: {
     fontSize: 12,
-    color: '#9ca3af',
-    textAlign: 'right',
+    color: '#6b7280',
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 24,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  metaContainer: {
+    flex: 1,
+  },
+  tag: {
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  tagText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  dueText: {
+    fontSize: 14,
+    color: '#1f2937',
+  },
+  doneButton: {
+    backgroundColor: 'white',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
   },
 });

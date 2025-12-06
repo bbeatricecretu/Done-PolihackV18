@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
-import { Plus, Search, Check, X } from 'lucide-react-native';
+import { Plus, Search, Check, X, ListFilter } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { NewMementoModal } from './NewMementoModal';
+import { FilterTasksModal, FilterState } from './FilterTasksModal';
 
 interface Task {
   id: number;
@@ -26,6 +28,14 @@ export function TasksPage() {
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>({
+    category: null,
+    source: null,
+    date: null,
+    status: null,
+  });
 
   const toggleTask = (id: number) => {
     setTasks(tasks.map(task => 
@@ -33,15 +43,70 @@ export function TasksPage() {
     ));
   };
 
-  const incompleteTasks = tasks.filter(t => !t.completed);
-  
-  const filteredTasks = searchQuery
-    ? incompleteTasks.filter(task => 
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.category?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : incompleteTasks;
+  const handleAddTask = (newTask: Task) => {
+    setTasks([newTask, ...tasks]);
+  };
+
+  // Extract unique values for filters
+  const availableCategories = useMemo(() => 
+    Array.from(new Set(tasks.map(t => t.category).filter(Boolean) as string[])),
+    [tasks]
+  );
+
+  const availableSources = useMemo(() => 
+    Array.from(new Set(tasks.map(t => t.source).filter(Boolean) as string[])),
+    [tasks]
+  );
+
+  const availableDates = useMemo(() => 
+    Array.from(new Set(tasks.map(t => t.date).filter(Boolean) as string[])),
+    [tasks]
+  );
+
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+
+    // Apply search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(task => 
+        task.title.toLowerCase().includes(query) ||
+        task.description.toLowerCase().includes(query) ||
+        task.category?.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply filters
+    if (activeFilters.category) {
+      result = result.filter(t => t.category === activeFilters.category);
+    }
+    if (activeFilters.source) {
+      result = result.filter(t => t.source === activeFilters.source);
+    }
+    if (activeFilters.date) {
+      result = result.filter(t => t.date === activeFilters.date);
+    }
+    if (activeFilters.status) {
+      if (activeFilters.status === 'completed') {
+        result = result.filter(t => t.completed);
+      } else if (activeFilters.status === 'in-progress') {
+        result = result.filter(t => !t.completed);
+      }
+    } else {
+      // Default behavior if no status filter is applied: show incomplete tasks (as per original code)
+      // However, if other filters are applied, user might expect to see completed ones too.
+      // Let's stick to the original logic: if no explicit status filter, show incomplete only?
+      // Or maybe "All" should be the default if filters are active?
+      // The original code had `const incompleteTasks = tasks.filter(t => !t.completed);`
+      // and then filtered from that.
+      // Let's preserve "incomplete only" as default unless "All" or "Completed" is selected.
+      if (activeFilters.status === null) {
+         result = result.filter(t => !t.completed);
+      }
+    }
+
+    return result;
+  }, [tasks, searchQuery, activeFilters]);
 
   const renderItem = ({ item }: { item: Task }) => (
     <TouchableOpacity 
@@ -81,7 +146,7 @@ export function TasksPage() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Tasks</Text>
-          <Text style={styles.headerSubtitle}>{incompleteTasks.length} active tasks</Text>
+          <Text style={styles.headerSubtitle}>{filteredTasks.length} tasks found</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity 
@@ -90,7 +155,16 @@ export function TasksPage() {
           >
             <Search size={20} color="#4b5563" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => setIsFilterVisible(true)}
+          >
+            <ListFilter size={20} color="#4b5563" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => setIsModalVisible(true)}
+          >
             <LinearGradient
               colors={['#fda4af', '#f9a8d4', '#c4b5fd']}
               style={styles.addButtonGradient}
@@ -127,9 +201,24 @@ export function TasksPage() {
       <FlatList
         data={filteredTasks}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+      />
+
+      <NewMementoModal
+        visible={isModalVisible}
+        onClose={() => setIsModalVisible(false)}
+        onAdd={handleAddTask}
+      />
+
+      <FilterTasksModal
+        visible={isFilterVisible}
+        onClose={() => setIsFilterVisible(false)}
+        onApply={setActiveFilters}
+        availableCategories={availableCategories}
+        availableSources={availableSources}
+        availableDates={availableDates}
       />
     </View>
   );
