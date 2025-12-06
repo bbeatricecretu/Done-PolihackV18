@@ -14,12 +14,19 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import ingestRouter from './routes/ingest';
 import tasksRouter from './routes/tasks';
+import * as localStorage from './services/localStorage';
 
 // Load environment variables
 dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize local storage
+localStorage.initializeStorage().catch(err => {
+  console.error('Failed to initialize storage:', err);
+  process.exit(1);
+});
 
 // Middleware
 app.use(cors()); // Allow requests from mobile app

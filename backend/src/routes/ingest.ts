@@ -8,6 +8,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import * as localStorage from '../services/localStorage';
 
 const router = Router();
 
@@ -71,17 +72,16 @@ router.post('/notification', async (req: Request, res: Response) => {
     const shouldCreateTask = await analyzeNotification(payload);
 
     if (shouldCreateTask) {
-      // TODO: Call MCP server to create task
-      const task = {
-        id: generateId(),
+      // Create task using local storage
+      const task = await localStorage.addTask({
         title: extractTaskTitle(payload),
         description: payload.body,
-        category: 'general',
-        priority: 'medium',
+        category: categorizeNotification(payload),
+        priority: determinePriority(payload),
+        status: 'pending',
         source: 'notification',
         source_app: payload.source_app,
-        created_at: new Date().toISOString()
-      };
+      });
 
       console.log('[Ingest] ✓ Task created:', task.title);
 
@@ -205,6 +205,46 @@ function extractTaskTitle(payload: NotificationPayload): string {
   // Otherwise, take first sentence
   const firstSentence = body.split(/[.!?]/)[0];
   return firstSentence.substring(0, 100);
+}
+
+/**
+ * Categorize notification based on content and source
+ */
+function categorizeNotification(payload: NotificationPayload): string {
+  const content = `${payload.title} ${payload.body}`.toLowerCase();
+  const source = payload.source_app.toLowerCase();
+
+  // Category mapping based on keywords
+  if (content.includes('meeting') || content.includes('appointment')) return 'meetings';
+  if (content.includes('bill') || content.includes('payment') || content.includes('invoice')) return 'finance';
+  if (content.includes('buy') || content.includes('shop') || content.includes('order')) return 'shopping';
+  if (content.includes('call') || content.includes('email') || content.includes('message')) return 'communication';
+  if (content.includes('doctor') || content.includes('health') || content.includes('appointment')) return 'health';
+  if (source.includes('calendar')) return 'meetings';
+  if (source.includes('bank') || source.includes('paypal')) return 'finance';
+  
+  return 'general';
+}
+
+/**
+ * Determine priority based on content
+ */
+function determinePriority(payload: NotificationPayload): 'low' | 'medium' | 'high' {
+  const content = `${payload.title} ${payload.body}`.toLowerCase();
+
+  // High priority keywords
+  const highKeywords = ['urgent', 'asap', 'immediately', 'today', 'deadline', 'critical', 'emergency'];
+  if (highKeywords.some(keyword => content.includes(keyword))) {
+    return 'high';
+  }
+
+  // Medium priority keywords
+  const mediumKeywords = ['tomorrow', 'soon', 'reminder', 'important', 'meeting'];
+  if (mediumKeywords.some(keyword => content.includes(keyword))) {
+    return 'medium';
+  }
+
+  return 'medium'; // Default to medium
 }
 
 /**

@@ -1,31 +1,32 @@
 /**
  * Tasks Router
  * 
- * Handles task CRUD operations
+ * Handles task CRUD operations with local JSON storage.
+ * Later will sync with Azure SQL Database.
  */
 
 import { Router, Request, Response } from 'express';
+import * as localStorage from '../services/localStorage';
 
 const router = Router();
-
-// Temporary in-memory storage (will be replaced with Azure SQL)
-let tasks: any[] = [];
 
 /**
  * GET /api/tasks
  * 
- * Fetch all tasks
+ * Fetch all tasks from local storage
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
     console.log('[Tasks] Fetching all tasks');
 
-    // TODO: Fetch from Azure SQL Database
-    
+    const tasks = await localStorage.getAllTasks();
+    const stats = await localStorage.getTaskStats();
+
     return res.json({
       success: true,
       tasks: tasks,
-      count: tasks.length
+      count: tasks.length,
+      stats: stats
     });
 
   } catch (error) {
@@ -47,8 +48,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
-    // TODO: Fetch from Azure SQL Database
-    const task = tasks.find(t => t.id === id);
+    const task = await localStorage.getTaskById(id);
 
     if (!task) {
       return res.status(404).json({
@@ -79,19 +79,27 @@ router.get('/:id', async (req: Request, res: Response) => {
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const taskData = req.body;
+    const { title, description, category, priority, due_date } = req.body;
 
-    console.log('[Tasks] Creating task:', taskData.title);
+    // Validate required fields
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title is required'
+      });
+    }
 
-    // TODO: Insert into Azure SQL Database via MCP
-    const task = {
-      id: `task_${Date.now()}`,
-      ...taskData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    console.log('[Tasks] Creating task:', title);
 
-    tasks.push(task);
+    const task = await localStorage.addTask({
+      title: title.trim(),
+      description: description?.trim(),
+      category: category || 'general',
+      priority: priority || 'medium',
+      status: 'pending',
+      due_date: due_date,
+      source: 'manual',
+    });
 
     return res.status(201).json({
       success: true,
@@ -118,27 +126,25 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Remove fields that shouldn't be updated directly
+    delete updates.id;
+    delete updates.created_at;
+    delete updates.is_deleted;
+
     console.log('[Tasks] Updating task:', id);
 
-    // TODO: Update in Azure SQL Database via MCP
-    const taskIndex = tasks.findIndex(t => t.id === id);
+    const task = await localStorage.updateTask(id, updates);
 
-    if (taskIndex === -1) {
+    if (!task) {
       return res.status(404).json({
         success: false,
         error: 'Task not found'
       });
     }
 
-    tasks[taskIndex] = {
-      ...tasks[taskIndex],
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-
     return res.json({
       success: true,
-      task: tasks[taskIndex]
+      task: task
     });
 
   } catch (error) {
@@ -162,19 +168,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     console.log('[Tasks] Deleting task:', id);
 
-    // TODO: Soft delete in Azure SQL Database
-    const taskIndex = tasks.findIndex(t => t.id === id);
+    const success = await localStorage.deleteTask(id);
 
-    if (taskIndex === -1) {
+    if (!success) {
       return res.status(404).json({
         success: false,
         error: 'Task not found'
       });
     }
-
-    // Soft delete
-    tasks[taskIndex].is_deleted = true;
-    tasks[taskIndex].deleted_at = new Date().toISOString();
 
     return res.json({
       success: true,
@@ -183,6 +184,69 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('[Tasks] Error deleting task:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * POST /api/tasks/:id/complete
+ * 
+ * Mark a task as completed
+ */
+router.post('/:id/complete', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    console.log('[Tasks] Completing task:', id);
+
+    const task = await localStorage.completeTask(id);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      task: task,
+      message: 'Task marked as completed'
+    });
+
+  } catch (error) {
+    console.error('[Tasks] Error completing task:', error);
+    
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
+/**
+ * GET /api/tasks/:id/history
+ * 
+ * Get history of changes for a task
+ */
+router.get('/:id/history', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const history = await localStorage.getTaskHistory(id);
+
+    return res.json({
+      success: true,
+      history: history,
+      count: history.length
+    });
+
+  } catch (error) {
+    console.error('[Tasks] Error fetching history:', error);
     
     return res.status(500).json({
       success: false,
