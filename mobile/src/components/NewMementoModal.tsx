@@ -19,15 +19,20 @@ interface NewMementoModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (task: any) => void;
+  availableCategories: string[];
 }
 
-export function NewMementoModal({ visible, onClose, onAdd }: NewMementoModalProps) {
+export function NewMementoModal({ visible, onClose, onAdd, availableCategories }: NewMementoModalProps) {
   const [description, setDescription] = useState('');
   const [showOptions, setShowOptions] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | null>(null);
+  
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [isNewCategory, setIsNewCategory] = useState(false);
 
   const handleAdd = () => {
     onAdd({
@@ -51,6 +56,55 @@ export function NewMementoModal({ visible, onClose, onAdd }: NewMementoModalProp
     setCategory('');
     setDueDate('');
     setPriority(null);
+    setShowCalendar(false);
+    setShowCategoryDropdown(false);
+    setIsNewCategory(false);
+  };
+
+  const renderCalendar = () => {
+    const days = Array.from({ length: 31 }, (_, i) => i + 1);
+    const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const startOffset = 1; // Dec 1 2025 is Monday
+
+    return (
+      <View style={styles.calendarContainer}>
+        <View style={styles.weekDaysRow}>
+          {weekDays.map((d, i) => (
+            <Text key={i} style={styles.weekDayText}>{d}</Text>
+          ))}
+        </View>
+        <View style={styles.daysGrid}>
+          {Array(startOffset).fill(null).map((_, i) => (
+            <View key={`empty-${i}`} style={styles.dayCell} />
+          ))}
+          {days.map(day => {
+            const dateStr = `Dec ${day}`;
+            const isSelected = dueDate === dateStr;
+            
+            return (
+              <TouchableOpacity
+                key={day}
+                style={[
+                  styles.dayCell,
+                  isSelected && styles.dayCellSelected
+                ]}
+                onPress={() => {
+                  setDueDate(dateStr);
+                  setShowCalendar(false);
+                }}
+              >
+                <Text style={[
+                  styles.dayText,
+                  isSelected && styles.dayTextSelected
+                ]}>
+                  {day}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -112,25 +166,75 @@ export function NewMementoModal({ visible, onClose, onAdd }: NewMementoModalProp
                       />
 
                       <Text style={styles.label}>Category</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Work, Personal, etc."
-                        placeholderTextColor="#9ca3af"
-                        value={category}
-                        onChangeText={setCategory}
-                      />
+                      <View style={styles.dropdownContainer}>
+                        <TouchableOpacity
+                          style={styles.dropdownHeader}
+                          onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                        >
+                          <Text style={[styles.dropdownTitle, !category && styles.placeholderText]}>
+                            {category || 'Select Category'}
+                          </Text>
+                          {showCategoryDropdown ? (
+                            <ChevronUp size={20} color="#6b7280" />
+                          ) : (
+                            <ChevronDown size={20} color="#6b7280" />
+                          )}
+                        </TouchableOpacity>
+                        
+                        {showCategoryDropdown && (
+                          <View style={styles.dropdownContent}>
+                            {availableCategories.map((cat) => (
+                              <TouchableOpacity
+                                key={cat}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                  setCategory(cat);
+                                  setShowCategoryDropdown(false);
+                                  setIsNewCategory(false);
+                                }}
+                              >
+                                <Text style={styles.dropdownItemText}>{cat}</Text>
+                              </TouchableOpacity>
+                            ))}
+                            <TouchableOpacity
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setCategory('');
+                                setShowCategoryDropdown(false);
+                                setIsNewCategory(true);
+                              }}
+                            >
+                              <Text style={[styles.dropdownItemText, styles.newItemText]}>+ New Category</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+
+                      {isNewCategory && (
+                        <TextInput
+                          style={[styles.input, { marginTop: -8 }]}
+                          placeholder="Enter new category name"
+                          placeholderTextColor="#9ca3af"
+                          value={category}
+                          onChangeText={setCategory}
+                          autoFocus
+                        />
+                      )}
 
                       <Text style={styles.label}>Due Date</Text>
                       <View style={styles.dateInputContainer}>
-                        <TextInput
-                          style={styles.dateInput}
-                          placeholder="mm/dd/yyyy"
-                          placeholderTextColor="#9ca3af"
-                          value={dueDate}
-                          onChangeText={setDueDate}
-                        />
-                        <Calendar size={20} color="#d1d5db" style={styles.calendarIcon} />
+                        <TouchableOpacity 
+                          style={styles.dateInputTouchable}
+                          onPress={() => setShowCalendar(!showCalendar)}
+                        >
+                          <Text style={[styles.dateText, !dueDate && styles.placeholderText]}>
+                            {dueDate || 'mm/dd/yyyy'}
+                          </Text>
+                          <Calendar size={20} color="#d1d5db" style={styles.calendarIcon} />
+                        </TouchableOpacity>
                       </View>
+                      
+                      {showCalendar && renderCalendar()}
 
                       <Text style={styles.label}>Priority</Text>
                       <View style={styles.priorityContainer}>
@@ -304,5 +408,101 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  calendarContainer: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  weekDayText: {
+    width: 32,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dayCell: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  dayCellSelected: {
+    backgroundColor: '#4f46e5',
+  },
+  dayText: {
+    fontSize: 14,
+    color: '#1f2937',
+  },
+  dayTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  dropdownContainer: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  dropdownTitle: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  placeholderText: {
+    color: '#9ca3af',
+  },
+  dropdownContent: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    backgroundColor: 'white',
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    padding: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#4b5563',
+  },
+  newItemText: {
+    color: '#4f46e5',
+    fontWeight: '500',
+  },
+  dateInputTouchable: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#1f2937',
   },
 });

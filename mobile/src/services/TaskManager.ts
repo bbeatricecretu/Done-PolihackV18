@@ -61,7 +61,11 @@ export class TaskManager {
     DevLogger.log('[TaskManager] Added task', newTask);
     
     // Sync to cloud
-    createTaskInCloud(newTask).catch(e => console.error('Cloud create failed', e));
+    try {
+      await createTaskInCloud(newTask);
+    } catch (e) {
+      console.error('Cloud create failed', e);
+    }
     
     return newTask;
   }

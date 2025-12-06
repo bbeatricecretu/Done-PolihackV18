@@ -92,6 +92,14 @@ function AppContent() {
     const { id, ...taskData } = newTask;
     const savedTask = await TaskManager.addTask(taskData);
     setTasks([savedTask, ...tasks]);
+
+    // Refresh from cloud to ensure consistent format
+    try {
+      const cloudTasks = await TaskManager.syncWithCloud();
+      setTasks(cloudTasks);
+    } catch (error) {
+      console.error('Failed to refresh tasks from cloud:', error);
+    }
   };
 
   const deleteTask = (id: number) => {
