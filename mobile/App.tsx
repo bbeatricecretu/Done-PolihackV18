@@ -18,6 +18,9 @@ import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
+import { LocationService } from './src/services/LocationService';
+
+import { syncLocation } from './src/services/CloudSync';
 
 // Register the Headless Task for background notification listening
 
@@ -30,37 +33,77 @@ function AppContent() {
     { id: '2', name: 'Work', address: 'Cluj Business Center', latitude: 46.7700, longitude: 23.5900 },
   ]);
 
-  // Load tasks from local storage on mount
+  // Global Sync Management (Location & Tasks)
   useEffect(() => {
-    const loadTasks = async () => {
-      // First load local tasks
-      let loadedTasks = await TaskManager.getTasks();
-      
-      // Then try to sync with cloud
+    // 1. Define Sync Functions
+    const syncUserLocation = async () => {
       try {
-        const cloudTasks = await TaskManager.syncWithCloud();
-        if (cloudTasks.length > 0) {
-          loadedTasks = cloudTasks;
+        console.log('[App] Starting global location sync...');
+        const location = await LocationService.getCurrentLocation();
+        if (location) {
+          console.log('[App] Got location:', location.latitude, location.longitude);
+          await syncLocation(location.latitude, location.longitude);
         }
-      } catch (e) {
-        console.error('Initial cloud sync failed', e);
-      }
-
-      if (loadedTasks.length > 0) {
-        setTasks(loadedTasks);
-      } else {
-        // Start with empty list
-        setTasks([]);
-      }
-      
-      // Sync with cloud
-      const currentTasks = await TaskManager.getTasks();
-      if (currentTasks.length > 0) {
-        syncTasksToCloud(currentTasks).catch(err => console.error('Sync failed:', err));
+      } catch (err) {
+        console.error('[App] Error in global location sync:', err);
       }
     };
-    loadTasks();
+
+    const syncTasks = async () => {
+      try {
+        console.log('[App] Syncing tasks from cloud...');
+        const cloudTasks = await TaskManager.syncWithCloud();
+        console.log('[App] Received', cloudTasks.length, 'tasks from sync');
+        setTasks(cloudTasks);
+      } catch (error) {
+        console.error('[App] Failed to sync tasks:', error);
+      }
+    };
+
+    // 2. Initial Load & Sync
+    const initializeApp = async () => {
+      // Load local tasks first for speed
+      const localTasks = await TaskManager.getTasks();
+      setTasks(localTasks);
+
+      // Perform initial syncs
+      await syncTasks();
+      await syncUserLocation();
+      
+      // Push local tasks to cloud to ensure consistency on startup
+      if (localTasks.length > 0) {
+         syncTasksToCloud(localTasks).catch(err => console.error('Initial push failed:', err));
+      }
+    };
+
+    initializeApp();
+
+    // 3. Set Intervals
+    const locationInterval = setInterval(syncUserLocation, 60000); // 60s
+    const tasksInterval = setInterval(syncTasks, 5000); // 5s
+
+    return () => {
+      clearInterval(locationInterval);
+      clearInterval(tasksInterval);
+    };
   }, []);
+
+  // Request location permissions on app launch
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        const granted = await LocationService.requestPermissions();
+        if (!granted) {
+          Alert.alert('Permission Denied', 'Location permission is required for nearby task alerts.');
+        }
+      } catch (e) {
+        console.error('Failed to request location permissions:', e);
+      }
+    };
+    requestPermissions();
+  }, []);
+
+
 
   const toggleTask = async (id: number) => {
     const taskToUpdate = tasks.find(t => t.id === id);

@@ -39,5 +39,48 @@ export const LocalIntelligence = {
     if (text.includes('?')) score += 1; // Questions might need answers
 
     return Math.min(score, 10);
+  },
+
+  /**
+   * Detect category from text content
+   */
+  detectCategory: (title: string, description: string = ''): string | null => {
+    const text = (title + " " + description).toLowerCase();
+    
+    const categories: Record<string, string[]> = {
+      'Groceries': ['grocery', 'milk', 'bread', 'eggs', 'supermarket', 'food', 'fruit', 'vegetable'],
+      'Pharmacy': ['pharmacy', 'medicine', 'drug', 'pill', 'prescription', 'doctor'],
+      'Bank': ['bank', 'atm', 'cash', 'deposit', 'withdraw', 'money'],
+      'Gym': ['gym', 'workout', 'exercise', 'fitness', 'training'],
+      'Restaurant': ['restaurant', 'dinner', 'lunch', 'breakfast', 'eat', 'food'],
+      'Coffee': ['coffee', 'cafe', 'latte', 'espresso', 'starbucks'],
+      'Gas Station': ['gas', 'fuel', 'petrol', 'station'],
+      'Work': ['meeting', 'office', 'work', 'presentation', 'boss', 'client']
+    };
+
+    for (const [category, keywords] of Object.entries(categories)) {
+      if (keywords.some(keyword => text.includes(keyword))) {
+        return category;
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Map category to Google Places API type
+   */
+  getPlaceTypeForCategory: (category: string): string | null => {
+    const typeMap: Record<string, string> = {
+      'Groceries': 'grocery_or_supermarket',
+      'Pharmacy': 'pharmacy',
+      'Bank': 'bank',
+      'Gym': 'gym',
+      'Restaurant': 'restaurant',
+      'Coffee': 'cafe',
+      'Gas Station': 'gas_station'
+    };
+    
+    return typeMap[category] || null;
   }
 };

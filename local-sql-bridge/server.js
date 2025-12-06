@@ -187,12 +187,14 @@ app.post('/api/sync', async (req, res) => {
 
 // Get All Tasks
 app.get('/api/tasks', async (req, res) => {
+  console.log('[GET /api/tasks] Fetching all tasks...');
   try {
     const result = await sql.query`
       SELECT * FROM Tasks 
       WHERE is_deleted = 0 
       ORDER BY created_at DESC
     `;
+    console.log(`[GET /api/tasks] Returning ${result.recordset.length} tasks`);
     res.json(result.recordset);
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -330,6 +332,7 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
+<<<<<<< Updated upstream
 // Manual trigger endpoint for AI Agent processing
 app.post('/api/process-notifications', async (req, res) => {
   console.log('\n[API] Manual trigger: Process notifications with AI Agent');
@@ -377,6 +380,193 @@ app.get('/api/notification-stats', async (req, res) => {
   } catch (error) {
     console.error('[API] Error getting stats:', error);
     res.status(500).json({ error: error.message });
+=======
+// Sync Location & Update Nearby Places
+app.post('/api/sync-location', async (req, res) => {
+  const { latitude, longitude } = req.body;
+  
+  if (!latitude || !longitude) {
+    return res.status(400).json({ error: 'Missing latitude or longitude' });
+  }
+
+  console.log(`Received location update: ${latitude}, ${longitude}`);
+  const GOOGLE_API_KEY = 'AIzaSyDdFH1W6GHJ07UIL3WJ52mPFsGup9zCvYY';
+
+  try {
+    // 1. Get active tasks
+    const result = await sql.query`
+        SELECT * FROM Tasks 
+        WHERE is_deleted = 0 
+        AND status != 'completed'
+    `;
+    
+    const tasks = result.recordset;
+    let updatedTasksCount = 0;
+
+    // Helper to detect category/keyword
+    const detectSearchKeyword = (task) => {
+        const text = (task.title + " " + (task.description || "")).toLowerCase();
+        
+        // 1. Expanded Category Mapping (Keyword -> Google Places Type/Query)
+        const categoryMap = {
+            // Food & Drink
+            'grocery': ['grocery', 'supermarket', 'market', 'food', 'milk', 'bread', 'eggs', 'fruit', 'vegetable'],
+            'bakery': ['bakery', 'bread', 'cake', 'pastry', 'bagel'],
+            'cafe': ['cafe', 'coffee', 'latte', 'espresso', 'tea', 'starbucks'],
+            'restaurant': ['restaurant', 'dinner', 'lunch', 'breakfast', 'eat', 'dining', 'meal', 'pizza', 'burger', 'sushi'],
+            'bar': ['bar', 'pub', 'beer', 'wine', 'drink', 'alcohol', 'liquor'],
+            
+            // Health & Wellness
+            'pharmacy': ['pharmacy', 'medicine', 'drug', 'pill', 'prescription', 'medication', 'chemist'],
+            'hospital': ['hospital', 'clinic', 'doctor', 'emergency', 'medical'],
+            'dentist': ['dentist', 'dental', 'teeth', 'tooth'],
+            'gym': ['gym', 'workout', 'exercise', 'fitness', 'training', 'yoga', 'pilates', 'crossfit'],
+            
+            // Shopping
+            'shopping_mall': ['mall', 'shopping', 'center', 'plaza'],
+            'clothing_store': ['clothes', 'clothing', 'shirt', 'pants', 'dress', 'shoes', 'fashion', 'boutique'],
+            'electronics_store': ['electronics', 'computer', 'phone', 'laptop', 'camera', 'tech', 'gadget'],
+            'hardware_store': ['hardware', 'tool', 'paint', 'repair', 'construction', 'diy', 'home depot'],
+            'book_store': ['book', 'novel', 'magazine', 'reading', 'library', 'bookstore'],
+            'florist': ['flower', 'florist', 'bouquet', 'rose', 'plant'],
+            'convenience_store': ['convenience', 'snack', 'drink', 'kiosk', '7-eleven'],
+            
+            // Services
+            'bank': ['bank', 'atm', 'cash', 'deposit', 'withdraw', 'money'],
+            'post_office': ['post', 'mail', 'package', 'shipping', 'letter', 'stamp', 'courier'],
+            'laundry': ['laundry', 'dry clean', 'wash', 'clothes'],
+            'hair_care': ['hair', 'haircut', 'barber', 'salon', 'beauty'],
+            'car_repair': ['mechanic', 'car', 'auto', 'repair', 'tire', 'oil change', 'service'],
+            'gas_station': ['gas', 'fuel', 'petrol', 'diesel', 'station'],
+            
+            // Leisure
+            'park': ['park', 'garden', 'playground', 'walk', 'hike'],
+            'movie_theater': ['movie', 'cinema', 'film', 'theater'],
+            'library': ['library', 'study', 'books']
+        };
+
+        // 2. Check explicit category first
+        if (task.category) {
+            const catLower = task.category.toLowerCase();
+            if (categoryMap[catLower]) return catLower; // Return the category name itself as the search term
+            // Or map specific app categories to search terms
+            if (catLower === 'shopping') return 'shopping_mall';
+            if (catLower === 'health') return 'pharmacy';
+            if (catLower === 'finance') return 'bank';
+        }
+
+        // 3. Check for keywords in text
+        for (const [cat, keywords] of Object.entries(categoryMap)) {
+            // Use word boundary check to avoid partial matches (e.g. "pill" in "pillow")
+            if (keywords.some(k => new RegExp(`\\b${k}\\b`).test(text))) {
+                return cat.replace('_', ' '); // Return "post office" instead of "post_office"
+            }
+        }
+
+        // 4. Fallback: Intelligent Extraction
+        // Remove common "stop words" and verbs to find the core object
+        const stopWords = [
+            'buy', 'get', 'purchase', 'find', 'pick', 'up', 'go', 'to', 'visit', 'check', 'do', 'make', 
+            'the', 'a', 'an', 'some', 'my', 'for', 'at', 'in', 'on', 'today', 'tomorrow', 'now', 'later'
+        ];
+        
+        const words = task.title.toLowerCase().split(/\s+/);
+        const meaningfulWords = words.filter(w => !stopWords.includes(w) && w.length > 2);
+        
+        if (meaningfulWords.length > 0 && meaningfulWords.length <= 3) {
+            return meaningfulWords.join(' ');
+        }
+
+        // 5. Last Resort: Use title if short enough
+        return task.title.length < 30 ? task.title : null;
+    };
+
+    for (const task of tasks) {
+        const keyword = detectSearchKeyword(task);
+        if (!keyword) {
+            console.log(`Skipping task "${task.title}" - no keyword detected`);
+            continue;
+        }
+
+        console.log(`Processing task "${task.title}" with keyword "${keyword}"`);
+
+        // Check if we already have locations for this task
+        const existingLocations = await sql.query`
+            SELECT TOP 1 id FROM TaskLocations WHERE task_id = ${task.id}
+        `;
+
+        if (existingLocations.recordset.length > 0) {
+            console.log(`Skipping task "${task.title}" - locations already exist`);
+            continue;
+        }
+
+        // 2. Search Google Places
+        const radius = 2000; // 2km
+        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${GOOGLE_API_KEY}`;
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.status === 'OK' && data.results.length > 0) {
+                console.log(`Found ${data.results.length} places for "${keyword}"`);
+                // 3. Clear old locations for this task
+                await sql.query`DELETE FROM TaskLocations WHERE task_id = ${task.id}`;
+
+                // 4. Insert new locations (top 10)
+                const locations = data.results.slice(0, 10);
+                
+                for (const loc of locations) {
+                    const request = new sql.Request();
+                    request.input('task_id', sql.UniqueIdentifier, task.id);
+                    request.input('name', sql.NVarChar(255), loc.name);
+                    request.input('address', sql.NVarChar(500), loc.vicinity || loc.formatted_address);
+                    request.input('latitude', sql.Float, loc.geometry.location.lat);
+                    request.input('longitude', sql.Float, loc.geometry.location.lng);
+                    request.input('place_id', sql.NVarChar(100), loc.place_id);
+                    request.input('rating', sql.Float, loc.rating || null);
+                    request.input('is_open', sql.Bit, loc.opening_hours?.open_now ? 1 : 0);
+
+                    await request.query(`
+                        INSERT INTO TaskLocations (
+                            task_id, name, address, latitude, longitude, 
+                            place_id, rating, is_open, distance_meters
+                        ) VALUES (
+                            @task_id, @name, @address, @latitude, @longitude, 
+                            @place_id, @rating, @is_open, 0
+                        )
+                    `);
+                }
+                updatedTasksCount++;
+            } else {
+                console.log(`No places found for "${keyword}". Marking as processed.`);
+                // Insert a dummy record so we don't search again
+                const request = new sql.Request();
+                request.input('task_id', sql.UniqueIdentifier, task.id);
+                await request.query(`
+                    INSERT INTO TaskLocations (
+                        task_id, name, address, latitude, longitude, 
+                        place_id, rating, is_open, distance_meters
+                    ) VALUES (
+                        @task_id, 'NO_LOCATIONS_FOUND', '', 0, 0, 
+                        'NO_RESULTS', 0, 0, 0
+                    )
+                `);
+            }
+        } catch (err) {
+            console.error(`Error processing task ${task.id}:`, err);
+        }
+    }
+
+    res.json({ 
+        success: true, 
+        message: `Processed location for ${tasks.length} tasks. Updated locations for ${updatedTasksCount} tasks.` 
+    });
+
+  } catch (err) {
+    console.error('Sync location error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+>>>>>>> Stashed changes
   }
 });
 
