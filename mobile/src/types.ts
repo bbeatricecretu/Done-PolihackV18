@@ -8,5 +8,14 @@ export interface Task {
   category?: string;
   priority?: string;
   source?: string;
+  location?: string;
   completedAt?: string;
+}
+
+export interface SavedLocation {
+  id: string;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
 }

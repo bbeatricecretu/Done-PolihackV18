@@ -5,17 +5,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { NewMementoModal } from './NewMementoModal';
 import { EditTaskModal } from './EditTaskModal';
 import { FilterTasksModal, FilterState } from './FilterTasksModal';
-import { Task } from '../types';
+import { Task, SavedLocation } from '../types';
 
 interface TasksPageProps {
   tasks: Task[];
+  savedLocations: SavedLocation[];
   onToggleTask: (id: number) => void;
   onAddTask: (task: Task) => void;
   onDeleteTask: (id: number) => void;
   onEditTask: (task: Task) => void;
 }
 
-export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEditTask }: TasksPageProps) {
+export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDeleteTask, onEditTask }: TasksPageProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -27,6 +28,7 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
     source: null,
     date: null,
     status: null,
+    location: null,
   });
 
   const handleAddTask = (newTask: Task) => {
@@ -85,13 +87,19 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
     if (activeFilters.date) {
       result = result.filter(t => t.date === activeFilters.date);
     }
+    if (activeFilters.location) {
+        result = result.filter(t => t.location === activeFilters.location);
+    }
+
     // Apply status filter
     if (activeFilters.status === 'completed') {
-      result = result.filter(t => t.completed);
+        result = result.filter(t => t.completed);
     } else if (activeFilters.status === 'in-progress') {
-      result = result.filter(t => !t.completed);
+        result = result.filter(t => !t.completed);
     } else if (activeFilters.status === 'all') {
-      // Show all tasks (no filtering)
+        // Show all tasks (no filtering)
+    }
+    
     } else {
       // Default behavior (status === null): show only incomplete tasks
       result = result.filter(t => !t.completed);
@@ -234,6 +242,7 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
         onClose={() => setIsModalVisible(false)}
         onAdd={handleAddTask}
         availableCategories={availableCategories}
+        savedLocations={savedLocations}
       />
 
       <FilterTasksModal
@@ -243,6 +252,7 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
         availableCategories={availableCategories}
         availableSources={availableSources}
         availableDates={availableDates}
+        savedLocations={savedLocations}
       />
 
       <EditTaskModal

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SavedLocation } from '../types';
 
 interface FilterTasksModalProps {
   visible: boolean;
@@ -18,6 +19,7 @@ interface FilterTasksModalProps {
   availableCategories: string[];
   availableSources: string[];
   availableDates: string[];
+  savedLocations: SavedLocation[];
 }
 
 export interface FilterState {
@@ -25,6 +27,7 @@ export interface FilterState {
   source: string | null;
   date: string | null;
   status: 'all' | 'completed' | 'in-progress' | null;
+  location: string | null;
 }
 
 export function FilterTasksModal({
@@ -34,12 +37,14 @@ export function FilterTasksModal({
   availableCategories,
   availableSources,
   availableDates,
+  savedLocations,
 }: FilterTasksModalProps) {
   const [filters, setFilters] = useState<FilterState>({
     category: null,
     source: null,
     date: null,
     status: null,
+    location: null,
   });
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -208,6 +213,14 @@ export function FilterTasksModal({
                   availableSources,
                   filters.source,
                   (item) => handleSelect('source', item)
+                )}
+
+                {renderDropdown(
+                  'Location',
+                  'location',
+                  savedLocations.map(l => l.name),
+                  filters.location,
+                  (item) => handleSelect('location', item)
                 )}
 
                 {renderCalendar()}
