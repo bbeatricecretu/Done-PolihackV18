@@ -4,180 +4,128 @@
  * This service listens to all device notifications and processes them
  * through LocalIntelligence before sending to backend.
  * 
- * IMPORTANT: This only works in standalone APK builds, NOT in Expo Go!
+ * USES: react-native-android-notification-listener
  */
 
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Alert, Linking, DeviceEventEmitter } from 'react-native';
+import RNAndroidNotificationListener, { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { LocalIntelligence } from './LocalIntelligence';
-import { CloudConnector } from './CloudConnector';
+import { TaskProcessor } from './TaskProcessor';
+import { TaskManager } from './TaskManager';
 import { DevLogger } from './DevLogger';
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
 export class NotificationListener {
-  private subscription: any = null;
-  private isListening: boolean = false;
+  private static isListening: boolean = false;
 
   /**
    * Initialize notification listener
-   * Requests permissions and sets up listener
+   * Checks for 'Notification Access' permission and redirects user if needed.
    */
-  async initialize() {
+  static async initialize() {
     if (Platform.OS !== 'android') {
       console.log('[NotificationListener] Only supported on Android');
       return false;
     }
 
     try {
-      // Request notification permissions
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+      // 1. Check if we have permission to listen
+      const status = await RNAndroidNotificationListener.getPermissionStatus();
+      DevLogger.log('[NotificationListener] Permission status:', status);
 
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
-      if (finalStatus !== 'granted') {
-        DevLogger.log('[NotificationListener] Permission denied');
+      if (status === 'denied' || status === 'unknown') {
+        // 2. If not, ask the user to enable it
+        Alert.alert(
+          'Memento Needs Access',
+          'To automatically create tasks from your notifications (like \'Bill Due\'), Memento needs \'Notification Access\'.\n\nPlease find \'Memento\' in the list and enable it.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open Settings', 
+              onPress: () => RNAndroidNotificationListener.requestPermission() 
+            }
+          ]
+        );
         return false;
       }
 
-      DevLogger.log('[NotificationListener] Permissions granted');
+      // 3. If granted, we are good to go.
+      if (!this.isListening) {
+        DevLogger.log('[NotificationListener] Listener initialized and ready.');
+        this.isListening = true;
+        
+        // Start listening for foreground events to show in Dev Console
+        this.listen();
+      }
 
-      // Start listening to notifications
-      this.startListening();
       return true;
 
     } catch (error) {
-      DevLogger.log('[NotificationListener] Initialization failed', error);
+      DevLogger.log('[NotificationListener] Error initializing:', error);
       return false;
     }
   }
 
   /**
-   * Start listening to incoming notifications
+   * Listen for notifications in the foreground (UI Thread)
+   * This allows us to show them in the Dev Console while the app is open.
    */
-  startListening() {
-    if (this.isListening) {
-      console.log('[NotificationListener] Already listening');
-      return;
-    }
-
-    this.subscription = Notifications.addNotificationReceivedListener(
-      this.handleNotification.bind(this)
-    );
-
-    this.isListening = true;
-    DevLogger.log('[NotificationListener] Started listening');
-  }
-
-  /**
-   * Stop listening to notifications
-   */
-  stopListening() {
-    if (this.subscription) {
-      this.subscription.remove();
-      this.subscription = null;
-      this.isListening = false;
-      DevLogger.log('[NotificationListener] Stopped listening');
-    }
-  }
-
-  /**
-   * Handle incoming notification
-   * Process through LocalIntelligence then send to backend
-   */
-  async handleNotification(notification: Notifications.Notification) {
-    try {
-      const { request } = notification;
-      const { content } = request;
+  static listen() {
+    DeviceEventEmitter.addListener('notificationReceived', (notification: any) => {
+      const { title, text, packageName } = notification;
       
-      const title = content.title || '';
-      const body = content.body || '';
-      const packageName = request.content.data?.packageName || 'unknown';
+      // Ignore self
+      if (packageName === 'com.memento.app') return;
 
-      DevLogger.log(`[Notification Received] ${packageName}`, { title, body, data: request.content.data });
+      DevLogger.log(`[Notification] Received from ${packageName}`, { title, text });
 
-      const appName = this.extractAppName(notification);
-
-      console.log(`[NotificationListener] Received: ${appName} - ${title}`);
-
-      // STEP 1: Local Intelligence Filter (Edge Brain)
-      if (LocalIntelligence.isNoise(title, body)) {
-        console.log('[NotificationListener] Filtered as noise');
-        return; // Don't send to backend
+      // We can also process tasks here if we want immediate UI updates, 
+      // but the Headless task usually handles the actual logic.
+      // For now, we just log it so the user sees it.
+      
+      if (LocalIntelligence.isNoise(title, text)) {
+        DevLogger.log('[Notification] Identified as Noise (Ignored)');
+      } else if (TaskProcessor.shouldCreateTask(title, text)) {
+        DevLogger.log('[Notification] MATCH! Creating Task...');
+      } else {
+        DevLogger.log('[Notification] No task keywords found.');
       }
-
-      // STEP 2: Calculate local urgency
-      const urgency = LocalIntelligence.calculateLocalUrgency(title, body);
-      console.log(`[NotificationListener] Urgency score: ${urgency}`);
-
-      // STEP 3: Send to Cloud Brain (Backend + AI Agent)
-      const result = await CloudConnector.processNotification(
-        title,
-        body,
-        appName
-      );
-
-      console.log('[NotificationListener] Backend response:', result);
-
-      // STEP 4: Handle response
-      if (result.action === 'task_created') {
-        console.log(`[NotificationListener] ✓ Task created: ${result.task?.title}`);
-        // TODO: Update local task cache
-        // TODO: Notify UI to refresh
-      } else if (result.action === 'task_updated') {
-        console.log(`[NotificationListener] ✓ Task updated: ${result.task?.title}`);
-      } else if (result.action === 'ignore') {
-        console.log('[NotificationListener] Backend ignored notification');
-      }
-
-    } catch (error) {
-      console.error('[NotificationListener] Error processing notification:', error);
-    }
-  }
-
-  /**
-   * Extract app name from notification
-   */
-  private extractAppName(notification: Notifications.Notification): string {
-    // Try to get app name from notification identifier
-    const identifier = notification.request.identifier;
-    
-    // This is a simplified version - actual implementation depends on Android API
-    // You may need to use native modules to get accurate app names
-    if (identifier.includes('whatsapp')) return 'WhatsApp';
-    if (identifier.includes('gmail')) return 'Gmail';
-    if (identifier.includes('messenger')) return 'Messenger';
-    if (identifier.includes('slack')) return 'Slack';
-    
-    return identifier.split('.')[0] || 'Unknown';
-  }
-
-  /**
-   * Check if currently listening
-   */
-  isActive(): boolean {
-    return this.isListening;
-  }
-
-  /**
-   * Get notification permission status
-   */
-  async getPermissionStatus(): Promise<string> {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status;
+    });
   }
 }
 
-// Export singleton instance
-export const notificationListener = new NotificationListener();
+/**
+ * This function handles notifications when the app is in the background or killed.
+ * It must be registered in your index.js or App.tsx
+ */
+export const notificationHeadlessTask = async ({ notification }: any) => {
+  if (!notification) return;
+
+  const { title, text, packageName, time } = notification;
+  
+  // Ignore our own notifications to prevent loops
+  if (packageName === 'com.memento.app') return;
+
+  // 1. Check if it's noise
+  if (LocalIntelligence.isNoise(title, text)) {
+    return;
+  }
+
+  // 2. Check if it should be a task
+  if (TaskProcessor.shouldCreateTask(title, text)) {
+    const taskTitle = TaskProcessor.extractTaskTitle(text);
+    const category = TaskProcessor.categorizeNotification(title, text, packageName);
+    
+    // 3. Create the task
+    await TaskManager.addTask({
+      title: taskTitle,
+      description: `From ${packageName}: ${title} - ${text}`,
+      completed: false,
+      date: new Date().toLocaleDateString(),
+      source: packageName,
+      category: category,
+      priority: TaskProcessor.determinePriority(title, text)
+    });
+    
+    console.log(`[Headless] Created task from ${packageName}`);
+  }
+};
