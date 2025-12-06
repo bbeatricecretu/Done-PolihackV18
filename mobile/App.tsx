@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, SafeAreaView, StatusBar, Platform } from 'react-native';
-import { Settings } from 'lucide-react-native';
+import { StyleSheet, View, StatusBar, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from './src/components/Navbar';
 import { HomePage } from './src/components/HomePage';
 import { ChatBoxPage } from './src/components/ChatBoxPage';
@@ -27,22 +27,24 @@ export default function App() {
   };
 
   return (
-    <LinearGradient
-      colors={['#eff6ff', '#f5f3ff', '#fdf2f8']} // blue-50, purple-50, pink-50
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" />
-        
-        {/* Page content */}
-        <View style={styles.content}>
-          {renderPage()}
-        </View>
-        
-        {/* Bottom navbar */}
-        <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      </SafeAreaView>
-    </LinearGradient>
+    <SafeAreaProvider>
+      <LinearGradient
+        colors={['#eff6ff', '#f5f3ff', '#fdf2f8']} // blue-50, purple-50, pink-50
+        style={styles.container}
+      >
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <StatusBar barStyle="dark-content" />
+          
+          {/* Page content */}
+          <View style={styles.content}>
+            {renderPage()}
+          </View>
+          
+          {/* Bottom navbar */}
+          <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+        </SafeAreaView>
+      </LinearGradient>
+    </SafeAreaProvider>
   );
 }
 
@@ -52,7 +54,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   content: {
     flex: 1,
