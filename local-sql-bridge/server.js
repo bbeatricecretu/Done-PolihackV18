@@ -112,7 +112,7 @@ app.post('/api/notifications', async (req, res) => {
   }
 });
 
-// Sync Endpoint
+// Sync Endpoint - Upload tasks from mobile to server
 app.post('/api/sync', async (req, res) => {
   const { tasks, deviceId } = req.body;
   
@@ -181,6 +181,41 @@ app.post('/api/sync', async (req, res) => {
     });
   } catch (err) {
     console.error('Sync error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Sync Download Endpoint - Get new/updated tasks from server to mobile
+app.get('/api/sync/tasks', async (req, res) => {
+  const { lastSyncTime } = req.query;
+  
+  try {
+    let query;
+    if (lastSyncTime) {
+      // Get tasks updated after last sync
+      const lastSync = new Date(lastSyncTime);
+      query = await sql.query`
+        SELECT * FROM Tasks 
+        WHERE updated_at > ${lastSync}
+        ORDER BY updated_at DESC
+      `;
+    } else {
+      // Get all non-deleted tasks
+      query = await sql.query`
+        SELECT * FROM Tasks 
+        WHERE is_deleted = 0
+        ORDER BY updated_at DESC
+      `;
+    }
+    
+    console.log(`[Sync Download] Returning ${query.recordset.length} tasks (lastSync: ${lastSyncTime || 'none'})`);
+    res.json({
+      success: true,
+      tasks: query.recordset,
+      serverTime: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Sync download error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -571,33 +606,40 @@ app.post('/api/sync-location', async (req, res) => {
   }
 });
 
+// Store for tracking last location update
+let lastLocationUpdate = null;
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`SQL Bridge running on port ${PORT}`);
   console.log(`Ensure your phone is on the same Wi-Fi and can reach this computer's IP.`);
-  console.log(`\nAI Agent Endpoints:`);
+  console.log(`\nEndpoints:`);
+  console.log(`  POST /api/notifications - Receive notifications`);
+  console.log(`  POST /api/sync - Upload tasks from mobile`);
+  console.log(`  GET  /api/sync/tasks - Download new tasks to mobile (every 5s)`);
+  console.log(`  POST /api/sync-location - Update location & find nearby places`);
   console.log(`  POST /api/process-notifications - Manually trigger AI processing`);
   console.log(`  GET  /api/notification-stats - View notification statistics`);
   
-  // Auto-process notifications every minute
+  // 1. Auto-process notifications every 1 minute
   if (process.env.AUTO_PROCESS_NOTIFICATIONS === 'true') {
     const intervalMinutes = parseInt(process.env.AUTO_PROCESS_INTERVAL_MINUTES || '1');
-    console.log(`\n🤖 Auto-processing enabled: Running every ${intervalMinutes} minute(s)`);
+    console.log(`\n🤖 [1] AI Agent: Processing notifications every ${intervalMinutes} minute(s)`);
     
     setInterval(async () => {
-      console.log('\n[Auto-Process] Running scheduled AI Agent batch...');
+      console.log('\n========== AI AGENT BATCH PROCESSING ==========');
       try {
         await aiAgent.processNotificationBatch(10);
       } catch (error) {
         console.error('[Auto-Process] Error:', error);
       }
+      console.log('===============================================\n');
     }, intervalMinutes * 60 * 1000);
   }
 
-  // Auto-cleanup old notifications
+  // 2. Auto-cleanup old notifications every 2 minutes
   const retentionMinutes = parseInt(process.env.NOTIFICATION_RETENTION_MINUTES || '10');
-  console.log(`🗑️  Auto-cleanup enabled: Deleting notifications older than ${retentionMinutes} minutes`);
+  console.log(`🗑️  [2] Cleanup: Deleting notifications older than ${retentionMinutes} minutes`);
   
-  // Run cleanup every 2 minutes
   setInterval(async () => {
     try {
       await aiAgent.cleanupOldNotifications(retentionMinutes);
@@ -605,4 +647,9 @@ app.listen(PORT, '0.0.0.0', () => {
       console.error('[Auto-Cleanup] Error:', error);
     }
   }, 2 * 60 * 1000);
+
+  // 3. Auto-update locations for tasks with recent location data
+  console.log(`📍 [3] Location: Auto-updating task locations when location changes`);
+  console.log(`    Note: Mobile app should call POST /api/sync-location periodically`);
+  console.log(`\n✅ All background jobs initialized`);
 });
