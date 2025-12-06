@@ -3,6 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, TextInput
 import { ChevronRight, Bell, Mail, Calendar, Info, Server, Wifi } from 'lucide-react-native';
 import { getServerIp, setServerIp, testServerConnection } from '../services/CloudSync';
 
+interface SettingsPageProps {
+  onSync?: () => Promise<void>;
+}
+
 interface SettingItemProps {
   icon: React.ElementType;
   title: string;
@@ -44,13 +48,13 @@ function SettingItem({ icon: Icon, title, subtitle, type, value, onValueChange, 
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ onSync }: SettingsPageProps) {
   const [notifications, setNotifications] = useState(true);
   const [email, setEmail] = useState(true);
   const [sms, setSms] = useState(false);
   const [calendar, setCalendar] = useState(false);
   const [serverIp, setServerIpState] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'syncing' | 'success' | 'error'>('idle');
 
   useEffect(() => {
     // Load saved server IP on mount
@@ -76,8 +80,22 @@ export function SettingsPage() {
     setConnectionStatus('testing');
     await setServerIp(serverIp.trim()); // Save before testing
     const result = await testServerConnection();
-    setConnectionStatus(result.success ? 'success' : 'error');
-    Alert.alert(result.success ? 'Success' : 'Failed', result.message);
+    
+    if (result.success && onSync) {
+      // Automatically sync when connection succeeds
+      setConnectionStatus('syncing');
+      try {
+        await onSync();
+        setConnectionStatus('success');
+        Alert.alert('Success', 'Connected and synced with server!');
+      } catch (e) {
+        setConnectionStatus('success');
+        Alert.alert('Connected', 'Connected but sync failed.');
+      }
+    } else {
+      setConnectionStatus(result.success ? 'success' : 'error');
+      Alert.alert(result.success ? 'Success' : 'Failed', result.message);
+    }
   };
 
   return (
@@ -112,13 +130,13 @@ export function SettingsPage() {
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.testButton, connectionStatus === 'testing' && styles.buttonDisabled]} 
+              style={[styles.testButton, (connectionStatus === 'testing' || connectionStatus === 'syncing') && styles.buttonDisabled]} 
               onPress={handleTestConnection}
-              disabled={connectionStatus === 'testing'}
+              disabled={connectionStatus === 'testing' || connectionStatus === 'syncing'}
             >
               <Wifi size={16} color="white" />
               <Text style={styles.buttonText}>
-                {connectionStatus === 'testing' ? 'Testing...' : 'Test'}
+                {connectionStatus === 'testing' ? 'Connecting...' : connectionStatus === 'syncing' ? 'Syncing...' : 'Connect'}
               </Text>
             </TouchableOpacity>
           </View>

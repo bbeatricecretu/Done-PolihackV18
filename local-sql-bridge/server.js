@@ -68,7 +68,12 @@ app.post('/api/sync', async (req, res) => {
         request.input('id', sql.UniqueIdentifier, task.id);
         request.input('title', sql.NVarChar(500), task.title);
         request.input('description', sql.NVarChar(sql.MAX), task.description || null);
-        request.input('category', sql.NVarChar(50), task.category);
+        
+        // Ensure category is valid (fallback to 'general' if invalid)
+        const validCategories = ['general', 'meetings', 'finance', 'shopping', 'communication', 'health'];
+        const category = validCategories.includes(task.category) ? task.category : 'general';
+        request.input('category', sql.NVarChar(50), category);
+        
         request.input('priority', sql.NVarChar(20), task.priority);
         request.input('status', sql.NVarChar(20), task.status);
         request.input('due_date', sql.DateTime2(7), task.due_date ? new Date(task.due_date) : null);
@@ -82,11 +87,6 @@ app.post('/api/sync', async (req, res) => {
         request.input('LocationDependent', sql.Bit, 0);
         request.input('TimeDependent', sql.Bit, 0);
         request.input('WeatherDependent', sql.Bit, 0);
-
-        // Ensure category is valid (fallback to 'general' if invalid)
-        const validCategories = ['general', 'meetings', 'finance', 'shopping', 'communication', 'health'];
-        const category = validCategories.includes(task.category) ? task.category : 'general';
-        request.input('category', sql.NVarChar(50), category);
 
         await request.query(`
             INSERT INTO Tasks (
