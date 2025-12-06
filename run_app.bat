@@ -46,5 +46,7 @@ echo 1. Open the "Expo Go" app on your phone.
 echo 2. Scan the QR code below.
 echo.
 
+echo Clearing Expo cache...
+if exist .expo rd /s /q .expo
 call npx expo start --clear
 pause
