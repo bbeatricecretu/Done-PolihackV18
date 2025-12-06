@@ -231,7 +231,7 @@ export function TasksPage({ tasks, onToggleTask, onAddTask, onDeleteTask, onEdit
       <FlatList
         data={filteredTasks}
         renderItem={renderItem}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={(item, index) => (item.id ? item.id.toString() : `temp-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
