@@ -1,5 +1,36 @@
-*/mobile/node_modules
-*/mobile/build  
-*/mobile/.expo
-*/mobile/.expo-shared
-*/mobile/dist
+# General
+.DS_Store
+Thumbs.db
+*.log
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+node_modules/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/dist/
+backend/coverage/
+
+# Mobile - Expo
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/.open-graph-image/
+
+# Mobile - Native Generated (Managed Workflow)
+mobile/android/
+mobile/ios/
+
+# Build Artifacts
+*.apk
+*.aab
