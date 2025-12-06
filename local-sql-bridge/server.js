@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
 const cors = require('cors');
+const { CosmosClient } = require('@azure/cosmos');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
@@ -26,6 +28,11 @@ const sqlConfig = {
   }
 };
 
+// CosmosDB configuration
+const cosmosClient = process.env.COSMOS_ENDPOINT && process.env.COSMOS_KEY 
+  ? new CosmosClient({ endpoint: process.env.COSMOS_ENDPOINT, key: process.env.COSMOS_KEY })
+  : null;
+
 // Connect to Database
 async function connectToDb() {
   try {
@@ -34,6 +41,20 @@ async function connectToDb() {
   } catch (err) {
     console.error('Database connection failed:', err);
   }
+
+  if (cosmosClient) {
+    try {
+      if (process.env.COSMOS_DATABASE) {
+        const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+        await database.read();
+        console.log(`Connected to Azure Cosmos DB (Database: ${process.env.COSMOS_DATABASE})`);
+      } else {
+        console.log('Cosmos DB Client initialized (no database specified)');
+      }
+    } catch (err) {
+      console.error('Cosmos DB connection failed:', err.message);
+    }
+  }
 }
 
 connectToDb();
@@ -41,6 +62,48 @@ connectToDb();
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Notification Ingest Endpoint
+app.post('/api/notifications', async (req, res) => {
+  console.log('\n========== NOTIFICATION RECEIVED ==========');
+  console.log('Raw body:', JSON.stringify(req.body, null, 2));
+  console.log('============================================\n');
+
+  const { appName, title, content, timestamp } = req.body;
+
+  if (!appName || !title) {
+    console.log('ERROR: Missing required fields - appName:', appName, 'title:', title);
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
+
+  if (!cosmosClient) {
+    console.error('CosmosDB not configured');
+    return res.status(503).json({ success: false, error: 'CosmosDB not configured' });
+  }
+
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const container = database.container(process.env.COSMOS_CONTAINER);
+
+    const notification = {
+      id: crypto.randomUUID(),
+      appName,
+      title,
+      content,
+      timestamp: timestamp || new Date().toISOString(),
+      processed: false,
+      created_at: new Date().toISOString()
+    };
+
+    await container.items.create(notification);
+
+    console.log(`Stored notification from ${appName}: ${title}`);
+    res.json({ success: true, message: 'Notification stored' });
+  } catch (err) {
+    console.error('Error storing notification:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Sync Endpoint
