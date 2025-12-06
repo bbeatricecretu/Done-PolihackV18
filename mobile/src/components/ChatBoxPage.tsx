@@ -64,6 +64,14 @@ export function ChatBoxPage() {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* Animated mesh gradient background simulation */}
+      <View style={styles.backgroundContainer}>
+        <View style={[styles.orb, styles.orb1]} />
+        <View style={[styles.orb, styles.orb2]} />
+        <View style={[styles.orb, styles.orb3]} />
+        <View style={[styles.orb, styles.orb4]} />
+      </View>
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>ChatBox</Text>
@@ -195,5 +203,44 @@ const styles = StyleSheet.create({
   sendButtonGradient: {
     padding: 8,
     borderRadius: 999,
+  },
+  backgroundContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    zIndex: -1,
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 999,
+    opacity: 0.5,
+  },
+  orb1: {
+    top: -50,
+    left: -50,
+    width: 300,
+    height: 300,
+    backgroundColor: '#e0f2fe', // sky-100
+  },
+  orb2: {
+    top: 100,
+    right: -50,
+    width: 300,
+    height: 300,
+    backgroundColor: '#ccfbf1', // teal-100
+  },
+  orb3: {
+    bottom: 0,
+    left: 50,
+    width: 300,
+    height: 300,
+    backgroundColor: '#ffe4e6', // rose-100
+  },
+  orb4: {
+    top: '40%',
+    left: '30%',
+    width: 250,
+    height: 250,
+    backgroundColor: '#f3e8ff', // purple-100
+    opacity: 0.4,
   },
 });
