@@ -14,6 +14,7 @@ import { TouchableOpacity } from 'react-native';
 import { Task } from './src/types';
 import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
+import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 
 // Register the Headless Task for background notification listening
@@ -27,7 +28,19 @@ export default function App() {
   // Load tasks from local storage on mount
   useEffect(() => {
     const loadTasks = async () => {
-      const loadedTasks = await TaskManager.getTasks();
+      // First load local tasks
+      let loadedTasks = await TaskManager.getTasks();
+      
+      // Then try to sync with cloud
+      try {
+        const cloudTasks = await TaskManager.syncWithCloud();
+        if (cloudTasks.length > 0) {
+          loadedTasks = cloudTasks;
+        }
+      } catch (e) {
+        console.error('Initial cloud sync failed', e);
+      }
+
       if (loadedTasks.length > 0) {
         setTasks(loadedTasks);
       } else {
@@ -50,6 +63,12 @@ export default function App() {
         }
         setTasks(await TaskManager.getTasks());
       }
+      
+      // Sync with cloud
+      const currentTasks = await TaskManager.getTasks();
+      if (currentTasks.length > 0) {
+        syncTasksToCloud(currentTasks).catch(err => console.error('Sync failed:', err));
+      }
     };
     loadTasks();
   }, []);
@@ -57,7 +76,12 @@ export default function App() {
   const toggleTask = async (id: number) => {
     const taskToUpdate = tasks.find(t => t.id === id);
     if (taskToUpdate) {
-      const updatedTask = { ...taskToUpdate, completed: !taskToUpdate.completed };
+      const isCompleted = !taskToUpdate.completed;
+      const updatedTask = { 
+        ...taskToUpdate, 
+        completed: isCompleted,
+        completedAt: isCompleted ? new Date().toISOString() : undefined
+      };
       setTasks(tasks.map(task => task.id === id ? updatedTask : task));
       await TaskManager.updateTask(updatedTask);
     }
