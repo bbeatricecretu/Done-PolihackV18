@@ -8,11 +8,20 @@
  */
 
 import { Platform, Alert, Linking, DeviceEventEmitter } from 'react-native';
-import RNAndroidNotificationListener, { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { LocalIntelligence } from './LocalIntelligence';
 import { TaskProcessor } from './TaskProcessor';
 import { TaskManager } from './TaskManager';
 import { DevLogger } from './DevLogger';
+
+// Conditional import for Android-only package
+let RNAndroidNotificationListener: any;
+let RNAndroidNotificationListenerHeadlessJsName: string | undefined;
+
+if (Platform.OS === 'android') {
+  const listener = require('react-native-android-notification-listener');
+  RNAndroidNotificationListener = listener.default;
+  RNAndroidNotificationListenerHeadlessJsName = listener.RNAndroidNotificationListenerHeadlessJsName;
+}
 
 export class NotificationListener {
   private static isListening: boolean = false;
@@ -98,34 +107,38 @@ export class NotificationListener {
  * It must be registered in your index.js or App.tsx
  */
 export const notificationHeadlessTask = async ({ notification }: any) => {
-  if (!notification) return;
+  try {
+    if (!notification) return;
 
-  const { title, text, packageName, time } = notification;
-  
-  // Ignore our own notifications to prevent loops
-  if (packageName === 'com.memento.app') return;
-
-  // 1. Check if it's noise
-  if (LocalIntelligence.isNoise(title, text)) {
-    return;
-  }
-
-  // 2. Check if it should be a task
-  if (TaskProcessor.shouldCreateTask(title, text)) {
-    const taskTitle = TaskProcessor.extractTaskTitle(text);
-    const category = TaskProcessor.categorizeNotification(title, text, packageName);
+    const { title, text, packageName, time } = notification;
     
-    // 3. Create the task
-    await TaskManager.addTask({
-      title: taskTitle,
-      description: `From ${packageName}: ${title} - ${text}`,
-      completed: false,
-      date: new Date().toLocaleDateString(),
-      source: packageName,
-      category: category,
-      priority: TaskProcessor.determinePriority(title, text)
-    });
-    
-    console.log(`[Headless] Created task from ${packageName}`);
+    // Ignore our own notifications to prevent loops
+    if (packageName === 'com.memento.app') return;
+
+    // 1. Check if it's noise
+    if (LocalIntelligence.isNoise(title, text)) {
+      return;
+    }
+
+    // 2. Check if it should be a task
+    if (TaskProcessor.shouldCreateTask(title, text)) {
+      const taskTitle = TaskProcessor.extractTaskTitle(text);
+      const category = TaskProcessor.categorizeNotification(title, text, packageName);
+      
+      // 3. Create the task
+      await TaskManager.addTask({
+        title: taskTitle,
+        description: `From ${packageName}: ${title} - ${text}`,
+        completed: false,
+        date: new Date().toLocaleDateString(),
+        source: packageName,
+        category: category,
+        priority: TaskProcessor.determinePriority(title, text)
+      });
+      
+      console.log(`[Headless] Created task from ${packageName}`);
+    }
+  } catch (error) {
+    console.error('[Headless] Error processing notification:', error);
   }
 };
