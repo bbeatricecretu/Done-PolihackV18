@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
-import { Home, MessageCircle, CheckSquare } from 'lucide-react-native';
+import { Home, MessageCircle, CheckSquare, Settings } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface NavbarProps {
@@ -13,6 +13,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     { id: 'chat' as const, icon: MessageCircle, label: 'Chat' },
     { id: 'home' as const, icon: Home, label: 'Home' },
     { id: 'tasks' as const, icon: CheckSquare, label: 'Tasks' },
+    { id: 'settings' as const, icon: Settings, label: 'Settings' },
   ];
 
   return (
