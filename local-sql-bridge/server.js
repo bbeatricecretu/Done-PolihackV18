@@ -4,10 +4,14 @@ const sql = require('mssql');
 const cors = require('cors');
 const { CosmosClient } = require('@azure/cosmos');
 const crypto = require('crypto');
+const AIAgentService = require('./ai-agent-service');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// Initialize AI Agent Service
+const aiAgent = new AIAgentService();
 
 const PORT = 3000;
 
@@ -93,7 +97,9 @@ app.post('/api/notifications', async (req, res) => {
       content,
       timestamp: timestamp || new Date().toISOString(),
       processed: false,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      // Store task_id if this notification resulted in a task (filled by agent)
+      related_task_id: null
     };
 
     await container.items.create(notification);
@@ -324,7 +330,88 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
+// Manual trigger endpoint for AI Agent processing
+app.post('/api/process-notifications', async (req, res) => {
+  console.log('\n[API] Manual trigger: Process notifications with AI Agent');
+  
+  try {
+    const batchSize = req.body.batchSize || 10;
+    const result = await aiAgent.processNotificationBatch(batchSize);
+    
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error('[API] Error processing notifications:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get notification statistics
+app.get('/api/notification-stats', async (req, res) => {
+  if (!cosmosClient) {
+    return res.status(503).json({ error: 'CosmosDB not configured' });
+  }
+
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const container = database.container(process.env.COSMOS_CONTAINER);
+
+    const { resources: all } = await container.items
+      .query("SELECT VALUE COUNT(1) FROM c")
+      .fetchAll();
+    
+    const { resources: unprocessed } = await container.items
+      .query("SELECT VALUE COUNT(1) FROM c WHERE c.processed = false")
+      .fetchAll();
+
+    res.json({
+      total: all[0] || 0,
+      unprocessed: unprocessed[0] || 0,
+      processed: (all[0] || 0) - (unprocessed[0] || 0)
+    });
+  } catch (error) {
+    console.error('[API] Error getting stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`SQL Bridge running on port ${PORT}`);
   console.log(`Ensure your phone is on the same Wi-Fi and can reach this computer's IP.`);
+  console.log(`\nAI Agent Endpoints:`);
+  console.log(`  POST /api/process-notifications - Manually trigger AI processing`);
+  console.log(`  GET  /api/notification-stats - View notification statistics`);
+  
+  // Auto-process notifications every minute
+  if (process.env.AUTO_PROCESS_NOTIFICATIONS === 'true') {
+    const intervalMinutes = parseInt(process.env.AUTO_PROCESS_INTERVAL_MINUTES || '1');
+    console.log(`\n🤖 Auto-processing enabled: Running every ${intervalMinutes} minute(s)`);
+    
+    setInterval(async () => {
+      console.log('\n[Auto-Process] Running scheduled AI Agent batch...');
+      try {
+        await aiAgent.processNotificationBatch(10);
+      } catch (error) {
+        console.error('[Auto-Process] Error:', error);
+      }
+    }, intervalMinutes * 60 * 1000);
+  }
+
+  // Auto-cleanup old notifications
+  const retentionMinutes = parseInt(process.env.NOTIFICATION_RETENTION_MINUTES || '10');
+  console.log(`🗑️  Auto-cleanup enabled: Deleting notifications older than ${retentionMinutes} minutes`);
+  
+  // Run cleanup every 2 minutes
+  setInterval(async () => {
+    try {
+      await aiAgent.cleanupOldNotifications(retentionMinutes);
+    } catch (error) {
+      console.error('[Auto-Cleanup] Error:', error);
+    }
+  }, 2 * 60 * 1000);
 });
