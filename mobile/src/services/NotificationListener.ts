@@ -107,34 +107,38 @@ export class NotificationListener {
  * It must be registered in your index.js or App.tsx
  */
 export const notificationHeadlessTask = async ({ notification }: any) => {
-  if (!notification) return;
+  try {
+    if (!notification) return;
 
-  const { title, text, packageName, time } = notification;
-  
-  // Ignore our own notifications to prevent loops
-  if (packageName === 'com.memento.app') return;
-
-  // 1. Check if it's noise
-  if (LocalIntelligence.isNoise(title, text)) {
-    return;
-  }
-
-  // 2. Check if it should be a task
-  if (TaskProcessor.shouldCreateTask(title, text)) {
-    const taskTitle = TaskProcessor.extractTaskTitle(text);
-    const category = TaskProcessor.categorizeNotification(title, text, packageName);
+    const { title, text, packageName, time } = notification;
     
-    // 3. Create the task
-    await TaskManager.addTask({
-      title: taskTitle,
-      description: `From ${packageName}: ${title} - ${text}`,
-      completed: false,
-      date: new Date().toLocaleDateString(),
-      source: packageName,
-      category: category,
-      priority: TaskProcessor.determinePriority(title, text)
-    });
-    
-    console.log(`[Headless] Created task from ${packageName}`);
+    // Ignore our own notifications to prevent loops
+    if (packageName === 'com.memento.app') return;
+
+    // 1. Check if it's noise
+    if (LocalIntelligence.isNoise(title, text)) {
+      return;
+    }
+
+    // 2. Check if it should be a task
+    if (TaskProcessor.shouldCreateTask(title, text)) {
+      const taskTitle = TaskProcessor.extractTaskTitle(text);
+      const category = TaskProcessor.categorizeNotification(title, text, packageName);
+      
+      // 3. Create the task
+      await TaskManager.addTask({
+        title: taskTitle,
+        description: `From ${packageName}: ${title} - ${text}`,
+        completed: false,
+        date: new Date().toLocaleDateString(),
+        source: packageName,
+        category: category,
+        priority: TaskProcessor.determinePriority(title, text)
+      });
+      
+      console.log(`[Headless] Created task from ${packageName}`);
+    }
+  } catch (error) {
+    console.error('[Headless] Error processing notification:', error);
   }
 };
