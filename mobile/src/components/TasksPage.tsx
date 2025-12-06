@@ -88,25 +88,21 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
       result = result.filter(t => t.date === activeFilters.date);
     }
     if (activeFilters.location) {
-      result = result.filter(t => t.location === activeFilters.location);
+        result = result.filter(t => t.location === activeFilters.location);
     }
-    if (activeFilters.status) {
-      if (activeFilters.status === 'completed') {
+
+    // Apply status filter
+    if (activeFilters.status === 'completed') {
         result = result.filter(t => t.completed);
-      } else if (activeFilters.status === 'in-progress') {
+    } else if (activeFilters.status === 'in-progress') {
         result = result.filter(t => !t.completed);
-      }
+    } else if (activeFilters.status === 'all') {
+        // Show all tasks (no filtering)
+    }
+    
     } else {
-      // Default behavior if no status filter is applied: show incomplete tasks (as per original code)
-      // However, if other filters are applied, user might expect to see completed ones too.
-      // Let's stick to the original logic: if no explicit status filter, show incomplete only?
-      // Or maybe "All" should be the default if filters are active?
-      // The original code had `const incompleteTasks = tasks.filter(t => !t.completed);`
-      // and then filtered from that.
-      // Let's preserve "incomplete only" as default unless "All" or "Completed" is selected.
-      if (activeFilters.status === null) {
-         result = result.filter(t => !t.completed);
-      }
+      // Default behavior (status === null): show only incomplete tasks
+      result = result.filter(t => !t.completed);
     }
 
     return result;

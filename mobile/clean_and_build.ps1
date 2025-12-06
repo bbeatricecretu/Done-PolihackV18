@@ -1,5 +1,14 @@
 Write-Host "Cleaning and Building Memento APK..." -ForegroundColor Cyan
 
+# Set JAVA_HOME to Microsoft OpenJDK 17 to avoid version mismatch (Java 25 causes "major version 69" error)
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.9.8-hotspot"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+Write-Host "Set JAVA_HOME to: $env:JAVA_HOME" -ForegroundColor Gray
+
+# Set ANDROID_HOME
+$env:ANDROID_HOME = "C:\Users\Bogdan\AppData\Local\Android\Sdk"
+Write-Host "Set ANDROID_HOME to: $env:ANDROID_HOME" -ForegroundColor Gray
+
 # 0. Set Node.js Path (Fix for npm not found)
 $env:Path = "C:\Program Files\nodejs;$env:Path"
 Write-Host "Added Node.js to PATH: C:\Program Files\nodejs" -ForegroundColor Gray

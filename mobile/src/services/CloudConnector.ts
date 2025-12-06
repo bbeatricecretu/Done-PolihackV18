@@ -8,6 +8,10 @@
 import { TaskProcessor } from './TaskProcessor';
 import { TaskManager } from './TaskManager';
 import { DevLogger } from './DevLogger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SERVER_IP_KEY = '@memento_server_ip';
+const DEFAULT_PORT = '3000';
 
 // Backend response format (kept for compatibility)
 interface ProcessNotificationResponse {
@@ -24,6 +28,19 @@ interface ProcessNotificationResponse {
 }
 
 export class CloudConnector {
+  /**
+   * Get the backend URL from AsyncStorage
+   */
+  private static async getBackendUrl(): Promise<string> {
+    try {
+      const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+      const ip = storedIp || '192.168.1.128'; // Default fallback
+      return `http://${ip}:${DEFAULT_PORT}`;
+    } catch (e) {
+      return 'http://192.168.1.128:3000';
+    }
+  }
+
   /**
    * Process a notification locally
    */
@@ -95,9 +112,38 @@ export class CloudConnector {
   }
 
   /**
-   * Update backend URL - No-op
+   * Update backend URL - now uses AsyncStorage
    */
-  static setBackendUrl(url: string): void {
-    console.log('[CloudConnector] Running in local mode, URL ignored');
+  static async setBackendUrl(url: string): Promise<void> {
+    await AsyncStorage.setItem(SERVER_IP_KEY, url);
+    DevLogger.log('[CloudConnector] Backend URL set to:', url);
+  }
+
+  /**
+   * Send notification to the bridge for MCP processing
+   */
+  static async sendNotification(notification: { appName: string, title: string, content: string, timestamp: string }) {
+    try {
+      const backendUrl = await this.getBackendUrl();
+      DevLogger.log('[CloudConnector] Sending notification to bridge...', { url: backendUrl, title: notification.title });
+      
+      const response = await fetch(`${backendUrl}/api/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notification),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      DevLogger.log('[CloudConnector] Notification sent to bridge successfully');
+      return true;
+    } catch (error) {
+      DevLogger.log('[CloudConnector] Failed to send notification to bridge', error);
+      return false;
+    }
   }
 }

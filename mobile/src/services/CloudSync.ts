@@ -26,17 +26,35 @@ export async function setServerIp(ip: string): Promise<void> {
 
 export async function testServerConnection(): Promise<{ success: boolean; message: string }> {
   try {
-    const apiBase = await getApiBase();
-    const response = await fetch(`${apiBase}/health`, { 
+    const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+    if (!storedIp) {
+      return { success: false, message: 'No server IP configured. Please enter an IP address.' };
+    }
+    
+    const url = `http://${storedIp}:${DEFAULT_PORT}/api/health`;
+    console.log('[CloudSync] Testing connection to:', url);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch(url, { 
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
+    
     if (response.ok) {
       return { success: true, message: 'Connected to server!' };
     }
     return { success: false, message: `Server returned status ${response.status}` };
-  } catch (e) {
-    return { success: false, message: 'Cannot reach server. Check IP and ensure bridge is running.' };
+  } catch (e: any) {
+    console.log('[CloudSync] Connection test failed:', e);
+    if (e.name === 'AbortError') {
+      return { success: false, message: 'Connection timed out. Check IP and firewall.' };
+    }
+    return { success: false, message: `Error: ${e.message || 'Cannot reach server'}` };
   }
 }
 

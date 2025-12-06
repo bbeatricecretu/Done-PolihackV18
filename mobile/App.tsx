@@ -49,24 +49,8 @@ function AppContent() {
       if (loadedTasks.length > 0) {
         setTasks(loadedTasks);
       } else {
-        // Initial seed data if empty
-        const initialTasks: Task[] = [
-          { id: 1, title: 'Review meeting notes', description: 'From yesterday\'s team sync', completed: false, dueDate: 'Due in 2 days', date: 'Dec 8', category: 'Work', priority: 'High', source: 'Email' },
-          { id: 2, title: 'Buy groceries', description: 'Milk, eggs, bread', completed: false, date: 'Dec 7', category: 'Personal', priority: 'Medium', source: 'Apps' },
-          { id: 4, title: 'Read book chapter', description: 'Chapter 5 - Productivity', completed: false, dueDate: 'Due in 4 days', date: 'Dec 10', category: 'Personal', priority: 'Low', source: 'Apps' },
-          { id: 5, title: 'Gym session', description: 'Leg day workout', completed: false, date: 'Dec 6', category: 'Social', priority: 'Medium', source: 'WhatsApp' },
-          { id: 6, title: 'Pay bills', description: 'Monthly utilities payment', completed: false, date: 'Dec 9', category: 'Finance', priority: 'High', source: 'Email' },
-        ];
-        // Save initial tasks one by one to ensure IDs are generated correctly or just save them
-        // For simplicity, we'll just set them in state and let the user save new ones.
-        // Or better, let's save them to storage so they persist.
-        for (const task of initialTasks) {
-          // We need to cast to Omit<Task, 'id'> but we want to keep these specific IDs?
-          // TaskManager generates IDs. Let's just use TaskManager.addTask for each.
-          const { id, ...taskData } = task;
-          await TaskManager.addTask(taskData);
-        }
-        setTasks(await TaskManager.getTasks());
+        // Start with empty list
+        setTasks([]);
       }
       
       // Sync with cloud
@@ -130,13 +114,30 @@ function AppContent() {
     await TaskManager.updateTask(editedTask);
   };
 
-  const addLocation = (location: Omit<SavedLocation, 'id'>) => {
+const addLocation = (location: Omit<SavedLocation, 'id'>) => {
     const newLocation = { ...location, id: Date.now().toString() };
     setSavedLocations([...savedLocations, newLocation]);
   };
 
   const updateLocation = (location: SavedLocation) => {
     setSavedLocations(savedLocations.map(loc => loc.id === location.id ? location : loc));
+  };
+
+  // Sync tasks with server - called when connecting to server
+  const syncWithServer = async () => {
+    const currentTasks = await TaskManager.getTasks();
+    
+    // First push local tasks to cloud
+    if (currentTasks.length > 0) {
+      await syncTasksToCloud(currentTasks);
+    }
+    
+    // Then pull tasks from cloud and update local
+    const cloudTasks = await TaskManager.syncWithCloud();
+    if (cloudTasks.length > 0) {
+      setTasks(cloudTasks);
+    }
+  };
   };
 
   // Initialize notification listener on app start
@@ -183,7 +184,7 @@ function AppContent() {
           onUpdateLocation={updateLocation}
         />;
       case 'settings':
-        return <SettingsPage />;
+        return <SettingsPage onSync={syncWithServer} />;
       default:
         return <HomePage 
           onNavigate={(page) => setCurrentPage(page)} 
