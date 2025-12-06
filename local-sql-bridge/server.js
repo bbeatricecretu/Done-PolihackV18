@@ -332,8 +332,6 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
 // Manual trigger endpoint for AI Agent processing
 app.post('/api/process-notifications', async (req, res) => {
   console.log('\n[API] Manual trigger: Process notifications with AI Agent');
@@ -381,9 +379,9 @@ app.get('/api/notification-stats', async (req, res) => {
   } catch (error) {
     console.error('[API] Error getting stats:', error);
     res.status(500).json({ error: error.message });
-=======
-=======
->>>>>>> Stashed changes
+  }
+});
+
 // Sync Location & Update Nearby Places
 app.post('/api/sync-location', async (req, res) => {
   const { latitude, longitude } = req.body;
@@ -393,6 +391,7 @@ app.post('/api/sync-location', async (req, res) => {
   }
 
   console.log(`Received location update: ${latitude}, ${longitude}`);
+  // Note: Consider moving this to .env
   const GOOGLE_API_KEY = 'AIzaSyDdFH1W6GHJ07UIL3WJ52mPFsGup9zCvYY';
 
   try {
@@ -569,10 +568,6 @@ app.post('/api/sync-location', async (req, res) => {
   } catch (err) {
     console.error('Sync location error:', err);
     res.status(500).json({ error: 'Internal server error' });
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   }
 });
 
