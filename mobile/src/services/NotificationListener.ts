@@ -8,11 +8,20 @@
  */
 
 import { Platform, Alert, Linking, DeviceEventEmitter } from 'react-native';
-import RNAndroidNotificationListener, { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { LocalIntelligence } from './LocalIntelligence';
 import { TaskProcessor } from './TaskProcessor';
 import { TaskManager } from './TaskManager';
 import { DevLogger } from './DevLogger';
+
+// Conditional import for Android-only package
+let RNAndroidNotificationListener: any;
+let RNAndroidNotificationListenerHeadlessJsName: string | undefined;
+
+if (Platform.OS === 'android') {
+  const listener = require('react-native-android-notification-listener');
+  RNAndroidNotificationListener = listener.default;
+  RNAndroidNotificationListenerHeadlessJsName = listener.RNAndroidNotificationListenerHeadlessJsName;
+}
 
 export class NotificationListener {
   private static isListening: boolean = false;
