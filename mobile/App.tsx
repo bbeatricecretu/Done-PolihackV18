@@ -14,11 +14,8 @@ import { TouchableOpacity } from 'react-native';
 import { Task } from './src/types';
 import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
-<<<<<<< Updated upstream
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
-=======
->>>>>>> Stashed changes
 
 // Register the Headless Task for background notification listening
 
