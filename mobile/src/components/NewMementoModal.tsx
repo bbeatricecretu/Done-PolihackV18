@@ -14,24 +14,28 @@ import {
 } from 'react-native';
 import { X, ChevronDown, ChevronUp, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SavedLocation } from '../types';
 
 interface NewMementoModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (task: any) => void;
   availableCategories: string[];
+  savedLocations: SavedLocation[];
 }
 
-export function NewMementoModal({ visible, onClose, onAdd, availableCategories }: NewMementoModalProps) {
+export function NewMementoModal({ visible, onClose, onAdd, availableCategories, savedLocations }: NewMementoModalProps) {
   const [description, setDescription] = useState('');
   const [showOptions, setShowOptions] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
+  const [location, setLocation] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High' | null>(null);
   
   const [showCalendar, setShowCalendar] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [isNewCategory, setIsNewCategory] = useState(false);
 
   const handleAdd = () => {
@@ -39,6 +43,7 @@ export function NewMementoModal({ visible, onClose, onAdd, availableCategories }
       title: title || 'New Memento',
       description,
       category,
+      location,
       dueDate,
       priority,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -54,10 +59,12 @@ export function NewMementoModal({ visible, onClose, onAdd, availableCategories }
     setShowOptions(false);
     setTitle('');
     setCategory('');
+    setLocation('');
     setDueDate('');
     setPriority(null);
     setShowCalendar(false);
     setShowCategoryDropdown(false);
+    setShowLocationDropdown(false);
     setIsNewCategory(false);
   };
 
@@ -220,6 +227,40 @@ export function NewMementoModal({ visible, onClose, onAdd, availableCategories }
                           autoFocus
                         />
                       )}
+
+                      <Text style={styles.label}>Location</Text>
+                      <View style={styles.dropdownContainer}>
+                        <TouchableOpacity
+                          style={styles.dropdownHeader}
+                          onPress={() => setShowLocationDropdown(!showLocationDropdown)}
+                        >
+                          <Text style={[styles.dropdownTitle, !location && styles.placeholderText]}>
+                            {location || 'Select Location'}
+                          </Text>
+                          {showLocationDropdown ? (
+                            <ChevronUp size={20} color="#6b7280" />
+                          ) : (
+                            <ChevronDown size={20} color="#6b7280" />
+                          )}
+                        </TouchableOpacity>
+                        
+                        {showLocationDropdown && (
+                          <View style={styles.dropdownContent}>
+                            {savedLocations.map((loc) => (
+                              <TouchableOpacity
+                                key={loc.id}
+                                style={styles.dropdownItem}
+                                onPress={() => {
+                                  setLocation(loc.name);
+                                  setShowLocationDropdown(false);
+                                }}
+                              >
+                                <Text style={styles.dropdownItemText}>{loc.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
 
                       <Text style={styles.label}>Due Date</Text>
                       <View style={styles.dateInputContainer}>

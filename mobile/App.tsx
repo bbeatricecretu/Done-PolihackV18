@@ -6,13 +6,14 @@ import { HomePage } from './src/components/HomePage';
 import { ChatBoxPage } from './src/components/ChatBoxPage';
 import { TasksPage } from './src/components/TasksPage';
 import { SettingsPage } from './src/components/SettingsPage';
+import { LocationsPage } from './src/components/LocationsPage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NotificationListener } from './src/services/NotificationListener';
 import { DevConsoleModal } from './src/components/DevConsoleModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { Terminal } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
-import { Task } from './src/types';
+import { Task, SavedLocation } from './src/types';
 import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
@@ -21,9 +22,13 @@ import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-androi
 // Register the Headless Task for background notification listening
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings'>('home');
+  const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings' | 'locations'>('home');
   const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([
+    { id: '1', name: 'Home', address: 'Cluj-Napoca, Romania', latitude: 46.7712, longitude: 23.6236 },
+    { id: '2', name: 'Work', address: 'Cluj Business Center', latitude: 46.7700, longitude: 23.5900 },
+  ]);
 
   // Load tasks from local storage on mount
   useEffect(() => {
@@ -125,6 +130,15 @@ function AppContent() {
     await TaskManager.updateTask(editedTask);
   };
 
+  const addLocation = (location: Omit<SavedLocation, 'id'>) => {
+    const newLocation = { ...location, id: Date.now().toString() };
+    setSavedLocations([...savedLocations, newLocation]);
+  };
+
+  const updateLocation = (location: SavedLocation) => {
+    setSavedLocations(savedLocations.map(loc => loc.id === location.id ? location : loc));
+  };
+
   // Initialize notification listener on app start
   useEffect(() => {
     const initNotifications = async () => {
@@ -155,10 +169,18 @@ function AppContent() {
       case 'tasks':
         return <TasksPage 
           tasks={tasks}
+          savedLocations={savedLocations}
           onToggleTask={toggleTask}
           onAddTask={addTask}
           onDeleteTask={deleteTask}
           onEditTask={editTask}
+        />;
+      case 'locations':
+        return <LocationsPage 
+          tasks={tasks}
+          savedLocations={savedLocations}
+          onAddLocation={addLocation}
+          onUpdateLocation={updateLocation}
         />;
       case 'settings':
         return <SettingsPage />;
