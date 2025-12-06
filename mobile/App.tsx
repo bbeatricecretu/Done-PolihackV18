@@ -8,9 +8,13 @@ import { TasksPage } from './src/components/TasksPage';
 import { SettingsPage } from './src/components/SettingsPage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { notificationListener } from './src/services/NotificationListener';
+import { DevConsoleModal } from './src/components/DevConsoleModal';
+import { Terminal } from 'lucide-react-native';
+import { TouchableOpacity } from 'react-native';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings'>('home');
+  const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
 
   // Initialize notification listener on app start
   useEffect(() => {
@@ -79,6 +83,19 @@ export default function App() {
           
           {/* Bottom navbar */}
           <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+
+          {/* Dev Console Button */}
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={() => setIsDevConsoleOpen(true)}
+          >
+            <Terminal size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <DevConsoleModal
+            visible={isDevConsoleOpen}
+            onClose={() => setIsDevConsoleOpen(false)}
+          />
         </SafeAreaView>
       </LinearGradient>
     </SafeAreaProvider>
@@ -95,5 +112,25 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     overflow: 'hidden',
+  },
+  devButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    backgroundColor: '#333',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
   },
 });

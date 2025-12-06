@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { LocalIntelligence } from './LocalIntelligence';
 import { CloudConnector } from './CloudConnector';
+import { DevLogger } from './DevLogger';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -47,10 +48,12 @@ export class NotificationListener {
 
       if (finalStatus !== 'granted') {
         console.log('[NotificationListener] Permission denied');
+        DevLogger.log('[NotificationListener] Permission denied');
         return false;
       }
 
       console.log('[NotificationListener] Permissions granted');
+      DevLogger.log('[NotificationListener] Permissions granted');
 
       // Start listening to notifications
       this.startListening();
@@ -58,6 +61,7 @@ export class NotificationListener {
 
     } catch (error) {
       console.error('[NotificationListener] Initialization failed:', error);
+      DevLogger.log('[NotificationListener] Initialization failed', error);
       return false;
     }
   }
@@ -77,6 +81,7 @@ export class NotificationListener {
 
     this.isListening = true;
     console.log('[NotificationListener] Started listening');
+    DevLogger.log('[NotificationListener] Started listening');
   }
 
   /**
@@ -88,6 +93,7 @@ export class NotificationListener {
       this.subscription = null;
       this.isListening = false;
       console.log('[NotificationListener] Stopped listening');
+      DevLogger.log('[NotificationListener] Stopped listening');
     }
   }
 
@@ -99,9 +105,13 @@ export class NotificationListener {
     try {
       const { request } = notification;
       const { content } = request;
-
+      
       const title = content.title || '';
       const body = content.body || '';
+      const packageName = request.content.data?.packageName || 'unknown';
+
+      DevLogger.log(`[Notification Received] ${packageName}`, { title, body, data: request.content.data });
+
       const appName = this.extractAppName(notification);
 
       console.log(`[NotificationListener] Received: ${appName} - ${title}`);
