@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
-import { ChevronRight, Bell, Mail, Calendar, Info } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, TextInput, Alert } from 'react-native';
+import { ChevronRight, Bell, Mail, Calendar, Info, Server, Wifi } from 'lucide-react-native';
+import { getServerIp, setServerIp, testServerConnection } from '../services/CloudSync';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -48,12 +49,80 @@ export function SettingsPage() {
   const [email, setEmail] = useState(true);
   const [sms, setSms] = useState(false);
   const [calendar, setCalendar] = useState(false);
+  const [serverIp, setServerIpState] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+
+  useEffect(() => {
+    // Load saved server IP on mount
+    getServerIp().then(ip => {
+      if (ip) setServerIpState(ip);
+    });
+  }, []);
+
+  const handleSaveServerIp = async () => {
+    if (!serverIp.trim()) {
+      Alert.alert('Error', 'Please enter a valid IP address');
+      return;
+    }
+    await setServerIp(serverIp.trim());
+    Alert.alert('Saved', `Server IP set to ${serverIp.trim()}`);
+  };
+
+  const handleTestConnection = async () => {
+    if (!serverIp.trim()) {
+      Alert.alert('Error', 'Please enter and save a server IP first');
+      return;
+    }
+    setConnectionStatus('testing');
+    await setServerIp(serverIp.trim()); // Save before testing
+    const result = await testServerConnection();
+    setConnectionStatus(result.success ? 'success' : 'error');
+    Alert.alert(result.success ? 'Success' : 'Failed', result.message);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
         <Text style={styles.headerSubtitle}>Manage your preferences</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Server Connection</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.iconContainer}>
+              <Server size={20} color="#a855f7" />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.cardTitle}>Bridge Server IP</Text>
+              <Text style={styles.cardSubtitle}>Your computer's local IP address</Text>
+            </View>
+          </View>
+          <TextInput
+            style={styles.ipInput}
+            placeholder="e.g., 192.168.1.100"
+            placeholderTextColor="#9ca3af"
+            value={serverIp}
+            onChangeText={setServerIpState}
+            keyboardType="numeric"
+          />
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSaveServerIp}>
+              <Text style={styles.buttonText}>Save</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.testButton, connectionStatus === 'testing' && styles.buttonDisabled]} 
+              onPress={handleTestConnection}
+              disabled={connectionStatus === 'testing'}
+            >
+              <Wifi size={16} color="white" />
+              <Text style={styles.buttonText}>
+                {connectionStatus === 'testing' ? 'Testing...' : 'Test'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -172,5 +241,45 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 13,
     color: '#6b7280',
+  },
+  ipInput: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    fontSize: 16,
+    color: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#a855f7',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  testButton: {
+    flex: 1,
+    backgroundColor: '#f472b6',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

@@ -38,6 +38,11 @@ async function connectToDb() {
 
 connectToDb();
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Sync Endpoint
 app.post('/api/sync', async (req, res) => {
   const { tasks, deviceId } = req.body;

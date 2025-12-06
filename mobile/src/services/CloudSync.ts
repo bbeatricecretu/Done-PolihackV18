@@ -1,10 +1,44 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Task } from '../types';
-// Configuration
-// Using computer's IP for connection since ADB might not be available
-const API_BASE = 'http://192.168.34.114:3000/api';
+
+// Configuration Keys
 const SYNC_KEY = '@memento_last_sync';
 const ID_MAP_KEY = '@memento_id_map';
+const SERVER_IP_KEY = '@memento_server_ip';
+const DEFAULT_PORT = '3000';
+
+// Get the API base URL dynamically from stored settings
+async function getApiBase(): Promise<string> {
+  const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+  const ip = storedIp || '192.168.1.1'; // Default fallback
+  return `http://${ip}:${DEFAULT_PORT}/api`;
+}
+
+// Export functions to get/set server IP from Settings
+export async function getServerIp(): Promise<string> {
+  const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+  return storedIp || '';
+}
+
+export async function setServerIp(ip: string): Promise<void> {
+  await AsyncStorage.setItem(SERVER_IP_KEY, ip);
+}
+
+export async function testServerConnection(): Promise<{ success: boolean; message: string }> {
+  try {
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/health`, { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      return { success: true, message: 'Connected to server!' };
+    }
+    return { success: false, message: `Server returned status ${response.status}` };
+  } catch (e) {
+    return { success: false, message: 'Cannot reach server. Check IP and ensure bridge is running.' };
+  }
+}
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -67,12 +101,13 @@ function mapTaskToCloud(task: Task, cloudId: string) {
 
 export async function createTaskInCloud(task: Task) {
   try {
+    const apiBase = await getApiBase();
     const cloudId = await getCloudId(task.id);
     const cloudTask = mapTaskToCloud(task, cloudId);
     
     console.log('[CloudSync] Creating task:', { title: task.title, cloudId, dueDate: task.dueDate });
     
-    const response = await fetch(`${API_BASE}/tasks`, {
+    const response = await fetch(`${apiBase}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cloudTask)
@@ -91,10 +126,11 @@ export async function createTaskInCloud(task: Task) {
 
 export async function updateTaskInCloud(task: Task) {
   try {
+    const apiBase = await getApiBase();
     const cloudId = await getCloudId(task.id);
     const cloudTask = mapTaskToCloud(task, cloudId);
     
-    const response = await fetch(`${API_BASE}/tasks/${cloudId}`, {
+    const response = await fetch(`${apiBase}/tasks/${cloudId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cloudTask)
@@ -113,7 +149,8 @@ export async function updateTaskInCloud(task: Task) {
 
 export async function fetchTasksFromCloud(currentLocalTasks: Task[]): Promise<Task[]> {
   try {
-    const response = await fetch(`${API_BASE}/tasks`);
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/tasks`);
     if (!response.ok) throw new Error('Failed to fetch from cloud');
     
     const cloudTasks = await response.json();
@@ -177,9 +214,10 @@ export async function fetchTasksFromCloud(currentLocalTasks: Task[]): Promise<Ta
 
 export async function deleteTaskInCloud(taskId: number) {
   try {
+    const apiBase = await getApiBase();
     const cloudId = await getCloudId(taskId);
     
-    await fetch(`${API_BASE}/tasks/${cloudId}`, {
+    await fetch(`${apiBase}/tasks/${cloudId}`, {
       method: 'DELETE'
     });
     console.log('[CloudSync] Deleted task:', cloudId);
@@ -212,8 +250,9 @@ export async function syncTasksToCloud(tasks: Task[]) {
     if (mapChanged) {
       await AsyncStorage.setItem(ID_MAP_KEY, JSON.stringify(idMap));
     }
-    
-    const response = await fetch(`${API_BASE}/sync`, {
+
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
