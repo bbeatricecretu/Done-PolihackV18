@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, StatusBar, Alert } from 'react-native';
+import { StyleSheet, View, StatusBar, Alert, AppRegistry } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from './src/components/Navbar';
 import { HomePage } from './src/components/HomePage';
@@ -7,7 +7,7 @@ import { ChatBoxPage } from './src/components/ChatBoxPage';
 import { TasksPage } from './src/components/TasksPage';
 import { SettingsPage } from './src/components/SettingsPage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { notificationListener } from './src/services/NotificationListener';
+import { NotificationListener, notificationHeadlessTask } from './src/services/NotificationListener';
 import { DevConsoleModal } from './src/components/DevConsoleModal';
 import { Terminal } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
@@ -15,6 +15,10 @@ import { Task } from './src/types';
 import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
+import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
+
+// Register the Headless Task for background notification listening
+AppRegistry.registerHeadlessTask(RNAndroidNotificationListenerHeadlessJsName, () => notificationHeadlessTask);
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings'>('home');
@@ -117,7 +121,7 @@ export default function App() {
   useEffect(() => {
     const initNotifications = async () => {
       console.log('[App] Initializing notification listener...');
-      const success = await notificationListener.initialize();
+      const success = await NotificationListener.initialize();
       
       if (success) {
         console.log('[App] ✓ Notification listener active');
@@ -128,16 +132,7 @@ export default function App() {
         );
       } else {
         console.log('[App] ✗ Notification listener failed to initialize');
-        Alert.alert(
-          'Notification Access Required',
-          'Please grant notification permissions in Settings to use Memento\'s smart task creation.',
-          [
-            { text: 'Later', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => {
-              // TODO: Open app settings
-            }}
-          ]
-        );
+        // Alert is already handled in initialize()
       }
     };
 
@@ -145,7 +140,7 @@ export default function App() {
 
     // Cleanup on unmount
     return () => {
-      notificationListener.stopListening();
+      // Listener persists in background
     };
   }, []);
 
