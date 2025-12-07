@@ -134,14 +134,18 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
 
         if (response.ok) {
           const data = await response.json();
-          const assistantMessage: Message = {
-            id: data.assistant_message_id || `assistant-${Date.now()}`,
-            text: data.response || 'I received your message.',
-            sender: 'assistant',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
           
-          setMessages(prev => [...prev, assistantMessage]);
+          // Only show assistant response if AI actually returned a message
+          if (data.response && data.response.trim()) {
+            const assistantMessage: Message = {
+              id: data.assistant_message_id || `assistant-${Date.now()}`,
+              text: data.response,
+              sender: 'assistant',
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            
+            setMessages(prev => [...prev, assistantMessage]);
+          }
           
           // If tool calls were executed, notify parent to refresh tasks
           if (data.execution_results && data.execution_results.length > 0) {
