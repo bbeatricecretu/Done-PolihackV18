@@ -23,87 +23,15 @@ export interface PlaceResult {
 
 export const LocationService = {
   /**
-   * Request location permissions explicitly (including background)
+   * Request location permissions explicitly
    */
   requestPermissions: async (): Promise<boolean> => {
     try {
-      // First request foreground permissions
-      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      if (foregroundStatus !== 'granted') {
-        DevLogger.log('[LocationService] Foreground permission denied');
-        return false;
-      }
-
-      // Then request background permissions
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        DevLogger.log('[LocationService] Background permission denied');
-        // Still return true if foreground is granted
-        return true;
-      }
-
-      DevLogger.log('[LocationService] All location permissions granted');
-      return true;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      return status === 'granted';
     } catch (error) {
       DevLogger.log('[LocationService] Error requesting permissions', error);
       return false;
-    }
-  },
-
-  /**
-   * Start background location tracking
-   */
-  startBackgroundLocationTracking: async (taskName: string = 'BACKGROUND_LOCATION_TASK'): Promise<boolean> => {
-    try {
-      const { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
-      const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
-
-      if (foregroundStatus !== 'granted' || backgroundStatus !== 'granted') {
-        DevLogger.log('[LocationService] Background location permissions not granted');
-        return false;
-      }
-
-      // Check if task is already registered
-      const isRegistered = await Location.hasStartedLocationUpdatesAsync(taskName);
-      if (isRegistered) {
-        DevLogger.log('[LocationService] Background location already running');
-        return true;
-      }
-
-      // Start background location updates
-      await Location.startLocationUpdatesAsync(taskName, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 60000, // Update every 60 seconds
-        distanceInterval: 50, // Or when moved 50 meters
-        foregroundService: {
-          notificationTitle: 'Memento Task Manager',
-          notificationBody: 'Tracking location for nearby task alerts',
-          notificationColor: '#3b82f6',
-        },
-        pausesUpdatesAutomatically: false,
-        showsBackgroundLocationIndicator: true,
-      });
-
-      DevLogger.log('[LocationService] Background location tracking started');
-      return true;
-    } catch (error) {
-      DevLogger.log('[LocationService] Error starting background location', error);
-      return false;
-    }
-  },
-
-  /**
-   * Stop background location tracking
-   */
-  stopBackgroundLocationTracking: async (taskName: string = 'BACKGROUND_LOCATION_TASK'): Promise<void> => {
-    try {
-      const isRegistered = await Location.hasStartedLocationUpdatesAsync(taskName);
-      if (isRegistered) {
-        await Location.stopLocationUpdatesAsync(taskName);
-        DevLogger.log('[LocationService] Background location tracking stopped');
-      }
-    } catch (error) {
-      DevLogger.log('[LocationService] Error stopping background location', error);
     }
   },
 
