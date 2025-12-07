@@ -620,7 +620,7 @@ async function updateDistancesAndNotify(userLat, userLon) {
       `);
     }
 
-    // Now query for tasks within 100 meters
+    // Now query for tasks within 100 meters, excluding those notified within 1 hour
     const nearbyResult = await sql.query`
       SELECT 
         tl.task_id,
@@ -631,20 +631,25 @@ async function updateDistancesAndNotify(userLat, userLon) {
         tl.address,
         tl.distance_meters,
         tl.latitude,
-        tl.longitude
+        tl.longitude,
+        n.last_sent_time
       FROM TaskLocations tl
       INNER JOIN Tasks t ON tl.task_id = t.id
+      LEFT JOIN Notifications n ON t.id = n.task_id 
+        AND n.notification_type = 'location' 
+        AND DATEDIFF(HOUR, n.last_sent_time, GETDATE()) < 1
       WHERE tl.distance_meters < 100
         AND tl.distance_meters > 0
         AND t.is_deleted = 0
         AND t.status = 'pending'
+        AND n.id IS NULL
       ORDER BY tl.distance_meters ASC
     `;
 
     const nearbyTasks = nearbyResult.recordset;
 
     if (nearbyTasks.length > 0) {
-      console.log(`📍 Found ${nearbyTasks.length} tasks within 100 meters`);
+      console.log(`📍 Found ${nearbyTasks.length} tasks within 100 meters (after cooldown filter)`);
       
       // Store notifications for the mobile app to poll
       global.proximityNotifications = global.proximityNotifications || [];
@@ -652,30 +657,69 @@ async function updateDistancesAndNotify(userLat, userLon) {
       for (const task of nearbyTasks) {
         console.log(`  → "${task.title}" at ${task.location_name} (${task.distance_meters}m away)`);
         
-        // Avoid duplicate notifications for the same task within 5 minutes
-        const existingIndex = global.proximityNotifications.findIndex(
-          n => n.task_id === task.task_id && 
-               (Date.now() - n.timestamp < 5 * 60 * 1000)
-        );
-        
-        if (existingIndex === -1) {
-          global.proximityNotifications.push({
-            task_id: task.task_id,
-            title: `📍 Nearby Task: ${task.title}`,
-            body: `You're ${task.distance_meters}m away from ${task.location_name}`,
-            priority: task.priority,
-            distance: task.distance_meters,
-            location_name: task.location_name,
-            timestamp: Date.now(),
-            id: Date.now().toString() + Math.random().toString(36)
-          });
-          console.log(`  ✅ Queued notification for: ${task.title}`);
-        } else {
-          console.log(`  ⏭️  Skipping duplicate notification for: ${task.title}`);
+        // CRITICAL: Record notification in database FIRST to prevent race conditions
+        try {
+          const notifRequest = new sql.Request();
+          notifRequest.input('task_id', sql.UniqueIdentifier, task.task_id);
+          notifRequest.input('notification_type', sql.NVarChar(50), 'location');
+          notifRequest.input('last_sent_time', sql.DateTime2(7), new Date());
+          
+          const insertResult = await notifRequest.query(`
+            IF EXISTS (SELECT 1 FROM Notifications WHERE task_id = @task_id AND notification_type = @notification_type)
+            BEGIN
+              -- Check if last notification was sent more than 1 hour ago
+              IF EXISTS (
+                SELECT 1 FROM Notifications 
+                WHERE task_id = @task_id 
+                  AND notification_type = @notification_type
+                  AND DATEDIFF(HOUR, last_sent_time, GETDATE()) >= 1
+              )
+              BEGIN
+                UPDATE Notifications 
+                SET last_sent_time = @last_sent_time, 
+                    notification_count = notification_count + 1
+                WHERE task_id = @task_id AND notification_type = @notification_type
+                SELECT 1 as should_send
+              END
+              ELSE
+              BEGIN
+                SELECT 0 as should_send
+              END
+            END
+            ELSE
+            BEGIN
+              INSERT INTO Notifications (task_id, notification_type, last_sent_time, notification_count)
+              VALUES (@task_id, @notification_type, @last_sent_time, 1)
+              SELECT 1 as should_send
+            END
+          `);
+          
+          const shouldSend = insertResult.recordset[0]?.should_send;
+          
+          if (shouldSend === 1) {
+            // Only queue if database confirmed it's okay to send
+            global.proximityNotifications.push({
+              task_id: task.task_id,
+              title: `📍 Nearby Task: ${task.title}`,
+              body: `You're ${task.distance_meters}m away from ${task.location_name}`,
+              priority: task.priority,
+              distance: task.distance_meters,
+              location_name: task.location_name,
+              timestamp: Date.now(),
+              id: Date.now().toString() + Math.random().toString(36)
+            });
+            
+            console.log(`  ✅ Notification queued and recorded: ${task.title}`);
+          } else {
+            console.log(`  ⏭️  Skipped (already sent within 1 hour): ${task.title}`);
+          }
+        } catch (dbError) {
+          console.error(`  ⚠️  Database error, skipping notification for safety:`, dbError.message);
+          // Do NOT queue notification if database operation fails
         }
       }
       
-      // Clean up old notifications (older than 10 minutes)
+      // Clean up old notifications from memory (older than 10 minutes)
       global.proximityNotifications = global.proximityNotifications.filter(
         n => Date.now() - n.timestamp < 10 * 60 * 1000
       );
@@ -760,6 +804,22 @@ app.listen(PORT, '0.0.0.0', () => {
       console.error('[Auto-Cleanup] Error:', error);
     }
   }, 2 * 60 * 1000);
+
+  // 2.5 Auto-cleanup old proximity notification records (older than 24 hours)
+  console.log(`🗑️  [2.5] Cleanup: Deleting old proximity notification records every 1 hour`);
+  
+  setInterval(async () => {
+    try {
+      await sql.query`
+        DELETE FROM Notifications 
+        WHERE notification_type = 'location' 
+          AND DATEDIFF(HOUR, last_sent_time, GETDATE()) > 24
+      `;
+      console.log('[Cleanup] Deleted old proximity notification records');
+    } catch (error) {
+      console.error('[Auto-Cleanup Proximity] Error:', error);
+    }
+  }, 60 * 60 * 1000); // Every 1 hour
 
   // 3. Auto-update locations for tasks with recent location data
   console.log(`📍 [3] Location: Auto-updating task locations when location changes`);
