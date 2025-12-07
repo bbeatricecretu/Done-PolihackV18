@@ -1,192 +1,127 @@
-# **Done --- The Task Manager That Helps You Focus**
+# Memento - Experiencing the world without overwhelming it.
 
-Done is an AI-powered task manager created during **Polihack v18**,
-designed to reduce overwhelm.\
-Instead of dumping dozens of tasks on you, Done highlights only the next
-most important one --- based on context, deadlines, notifications, and
-intelligent filtering.
+> **Hackathon Project:** "Experiencing the world without overwhelming it."
 
-------------------------------------------------------------------------
+Memento is not just another to-do list. It is an **Anti-To-Do List**. 
 
-## 🚀 **Why Us**
+Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Memento acts as a **Context-Aware Filter**, hiding 90% of your tasks to reduce cognitive load and only showing you what is actionable **right now** based on your location, weather, and energy levels.
 
-Most productivity apps overload users with:
-- too many lists
-- too many notifications
-- too many decisions
+---
 
-Done solves the real problem:
-**not information overload --- but timing overload.**
+## 🚀 Key Features
 
-You don't get stressed because you have tasks.
-You get stressed because they hit you at the wrong moment.
+### 1. 🧠 Context-Aware Task Filtering
+Instead of a long list of unchecked boxes, Memento shows you tasks relevant to your current context.
+- **Location:** "Buy Groceries" only appears when you are near a supermarket.
+- **Weather:** "Wash Car" is hidden if it's raining.
+- **Time:** "Call Mom" is suggested in the evening, not during work hours.
 
-Done fixes that automatically.
+### 2. 📩 AI-Powered Notification Ingestion
+Zero-friction entry. Memento listens to your Android notifications and uses AI to convert them into actionable tasks.
+- *Example:* You receive a text: "Can you pay the electric bill?" -> Memento creates a task: **"Pay Electric Bill"** (High Priority).
 
-------------------------------------------------------------------------
+### 3. 🤖 Intelligent Suggestions (MCP)
+Powered by a **Model Context Protocol (MCP)** server connected to Azure AI Foundry (GPT-4o).
+- The AI Agent analyzes your tasks and your environment to proactively suggest the *single best thing* to do right now.
 
-# ✨ **Core Features**
+---
 
-## 🏠 1. **Smart Home Page**
+## 🏗️ System Architecture
 
-The home screen shows:
-- **one** relevant task
-- selected using AI reasoning
-- based on urgency, context, history, and deadlines
+The project consists of three main components working in harmony:
 
-You always know what to do next.
+1.  **Mobile App (`/mobile`)**: 
+    - Built with **React Native** & **Expo**.
+    - Handles UI, Location Tracking, and Android Notification Listening.
+    - Communicates with the backend bridge.
 
-------------------------------------------------------------------------
+2.  **Backend Bridge (`/local-sql-bridge`)**:
+    - **Node.js** & **Express** server.
+    - Acts as the API gateway between the mobile app and the database.
+    - Manages the connection to **Azure SQL Database**.
+    - Orchestrates the AI Agent service.
 
-## 💬 2. **AI Chat Box (Azure Agent)**
+3.  **AI Layer (`/mcp-server`)**:
+    - Implements the **Model Context Protocol (MCP)**.
+    - Provides "Tools" to the Azure AI Agent (e.g., `create_task_from_notification`, `suggest_tasks_by_context`).
+    - Connects to **Azure Cosmos DB** for raw notification logs.
 
-A conversational assistant that can: 
-- create tasks
-- edit tasks
-- update deadlines
-- delete tasks
-- search and filter
-- understand natural language
+---
 
-Hosted on Azure AI Foundry with a custom MCP server.
+## 📂 Project Structure
 
-------------------------------------------------------------------------
-
-## 📋 3. **Manual Task Management**
-
-For users who want full control: 
-- complete task list
-- sorting and filtering
-- full CRUD
-- clean UI pages
-
-Still aligned with the "one task at a time" philosophy.
-
-------------------------------------------------------------------------
-
-## 🔔 4. **Notification Intelligence**
-
-Done reads your smartphone notifications and transforms them into tasks
-automatically.
-
-The AI can: 
-- detect meaningful reminders
-- merge similar notifications
-- fill in missing information (dates, names, context)
-- avoid duplicates
-
-**Example:**
-Two banking notifications → one clear "Pay rent" task.
-
-------------------------------------------------------------------------
-
-## 📍 5. **Location-Aware Tasks**
-
-After adding a task, Done can: 
-- search Google Maps API
-- suggest nearby locations
-- link real places to real tasks
-
-**Example:** Add "Pick up package" → Done suggests the nearest Posta
-Română.
-
-------------------------------------------------------------------------
-
-# 🧠 **Architecture**
-
-  -----------------------------------------------------------------------
-  Layer                                     Technology
-  ----------------------------------------- -----------------------------
-  **Frontend**                              React + Vite
-
-  **Mobile App**                            React Native + Expo (APK
-                                            required for notification
-                                            access)
-
-  **Backend**                               Node.js + Express
-
-  **AI System**                             Azure AI Foundry (GPT‑4o) +
-                                            custom MCP server
-
-  **Database**                              Azure SQL Database
-
-
-
-# 🛠️ **Quick Start**
-
-## ▶️ Backend
-
-``` bash
-cd backend
-npm install
-npm run dev
+```
+NoAIUsed/
+├── mobile/                 # React Native Android App
+│   ├── src/components/     # UI Screens (LocationsPage, TasksPage)
+│   ├── src/services/       # Background services (Location, Notifications)
+│   └── android/            # Native Android code
+├── local-sql-bridge/       # Main Backend API
+│   ├── server.js           # Express Server
+│   ├── ai-agent-service.js # Azure AI Integration
+│   └── create_locations_table.sql
+├── mcp-server/             # Model Context Protocol Server
+│   ├── src/index.ts        # Tool definitions for AI
+│   └── IMPLEMENTATION_SUMMARY.md
+├── idea.md                 # Core philosophy and design doc
+└── README.md               # This file
 ```
 
-## 📱 Mobile (APK Build)
+---
 
-``` bash
+## 🛠️ Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- JDK 17 (for Android build)
+- Android Studio & SDK (for Emulator/APK)
+- Azure SQL Database & Cosmos DB credentials
+
+### 1. Setup Backend Bridge
+```bash
+cd local-sql-bridge
+npm install
+# Create a .env file with DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME, COSMOS_ENDPOINT, COSMOS_KEY
+node server.js
+```
+
+### 2. Setup MCP Server
+```bash
+cd mcp-server
+npm install
+npm run build
+# Create a .env file with Azure credentials
+npm run start:http
+```
+
+### 3. Run Mobile App
+**Option A: Development (Expo Go)**
+```bash
 cd mobile
 npm install
-npm run build:android
+npx expo start
 ```
 
-Install APK → enable notification access.
-
-## 💻 Frontend
-
-``` bash
-cd frontend
-npm install
-npm run dev
+**Option B: Build APK (Required for Notification Access)**
+```bash
+cd mobile
+# Ensure JAVA_HOME is set to JDK 17
+./clean_and_build.ps1
+# Install the generated APK on your device
 ```
 
-------------------------------------------------------------------------
+---
 
-# 🔄 **Notification Payload Example**
+## 📱 Demo Flow (5 Minutes)
 
-``` json
-{
-  "source_app": "WhatsApp",
-  "title": "John Doe",
-  "body": "Meeting tomorrow at 3pm",
-  "timestamp": "2025-12-06T10:30:00.000Z"
-}
-```
+1.  **The Hook:** Show the "Anti-To-Do List" interface. It's calm and empty.
+2.  **The Context Switch:** Walk to a specific location (or simulate it). Watch the app surface a relevant task (e.g., "Pick up package" when near the post office).
+3.  **The Magic:** Send a dummy notification to the phone. Show Memento automatically parsing it and creating a prioritized task without you typing a word.
 
-------------------------------------------------------------------------
+---
 
-# 📂 **Project Structure**
+## 🛡️ Privacy & Philosophy
 
-    Done/
-    ├── backend/
-    │   ├── src/
-    │   │   ├── index.ts
-    │   │   └── routes/
-    │   │       ├── ingest.ts
-    │   │       └── tasks.ts
-    │   └── QUICKSTART.md
-    ├── mobile/
-    │   ├── src/
-    │   ├── app/
-    │   └── build/
-    └── frontend/
-        ├── src/
-        └── vite.config.js
-
-------------------------------------------------------------------------
-
-# 🧪 **Testing**
-
-1.  Start backend
-2.  Install the APK
-3.  Allow notification access
-4.  Trigger a real notification
-5.  Watch backend logs
-6.  Open the app to see the generated task
-
-------------------------------------------------------------------------
-
-# 🔮 **Future Improvements**
-
--   smart schedule planning
--   cross-device sync
+Memento is designed to help you experience the world, not just manage it. 
+- **Local First:** Location data is processed locally where possible.
+- **Curated Focus:** The AI acts as a filter, not a boss. You can always access your full list in the "Brain Dump" drawer.
