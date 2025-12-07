@@ -258,9 +258,9 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
 
   return (
     <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 30}
     >
       {/* Animated mesh gradient background simulation */}
       <BlobBackground opacity={0.4} flipColors={true} />
@@ -453,6 +453,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     padding: 24,
+    paddingBottom: Platform.OS === 'android' ? 50 : 24,
     borderTopWidth: 0,
     backgroundColor: 'transparent', // transparent to show gradient
   },
