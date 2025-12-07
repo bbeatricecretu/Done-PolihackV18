@@ -86,7 +86,7 @@ async function executeMCPTool(toolName, args) {
         .input('WeatherDependent', sql.Bit, args.weather_dependent || false)
         .input('TimeDependent', sql.Bit, args.time_dependent || false)
         .input('is_deleted', sql.Bit, false)
-        .input('source', sql.NVarChar(sql.MAX), 'chatbot')
+        .input('source', sql.NVarChar(sql.MAX), 'chat')
         .input('source_app', sql.NVarChar(sql.MAX), 'mobile_chat')
         .query(`INSERT INTO Tasks (id, title, description, category, priority, status, due_date, LocationDependent, WeatherDependent, TimeDependent, is_deleted, source, source_app, created_at, updated_at)
                 VALUES (@id, @title, @description, @category, @priority, @status, @due_date, @LocationDependent, @WeatherDependent, @TimeDependent, @is_deleted, @source, @source_app, GETDATE(), GETDATE())`);
