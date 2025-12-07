@@ -96,8 +96,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: "skip_notification",
+        description: "Skip/ignore a notification that does NOT require task creation. Use this for: battery notifications, message counters, system alerts, questions from others, past-tense actions, casual chat, or any notification that is not a direct action request for the user. This marks the notification as processed without creating a task.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            notification_id: {
+              type: "string",
+              description: "The ID of the notification to skip"
+            },
+            reason: {
+              type: "string",
+              description: "Brief reason for skipping (e.g., 'battery notification', 'message counter', 'not actionable')"
+            }
+          },
+          required: ["notification_id", "reason"]
+        }
+      },
+      {
         name: "create_task_from_notification",
-        description: "Create a task based on notification data. Use this after reviewing a notification with get_notifications.",
+        description: "Create a task ONLY if the notification is a DIRECT, EXPLICIT action request for the user to do something in the future. MUST verify: 1) Not a battery/system notification, 2) Not a message counter, 3) Not a question from someone else, 4) Not past-tense/completed action, 5) Not casual conversation. When in doubt, use skip_notification instead.",
         inputSchema: {
           type: "object",
           properties: {
@@ -174,6 +192,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["title"],
         },
+      },
+      {
+        name: "get_tasks_for_location",
+        description: "Get active tasks that need location data. Returns tasks without TaskLocations entries so the agent can generate search queries for them.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            limit: {
+              type: "number",
+              description: "Maximum number of tasks to retrieve (default: 10)"
+            }
+          }
+        }
+      },
+      {
+        name: "generate_search_query_for_task",
+        description: "Generate an optimized Google Maps API search query for a task. Analyzes task title, description, and category to create the best possible search term. Returns the search query that will be used with Google Places API.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "Task UUID"
+            },
+            search_query: {
+              type: "string",
+              description: "Optimized search query for Google Maps API (e.g., 'grocery store', 'pharmacy', 'hardware store'). Should be concise and specific."
+            }
+          },
+          required: ["task_id", "search_query"]
+        }
       },
       {
         name: "suggest_tasks_by_context",
@@ -347,6 +396,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     case "delete_notification":
       return await handleDeleteNotification(args);
     
+    case "skip_notification":
+      return await handleSkipNotification(args);
+    
     case "create_task_from_notification":
       return await handleCreateTaskFromNotification(args);
     
@@ -370,6 +422,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     
     case "delete_task":
       return await handleDeleteTask(args);
+    
+    case "get_tasks_for_location":
+      return await handleGetTasksForLocation(args);
+    
+    case "generate_search_query_for_task":
+      return await handleGenerateSearchQuery(args);
 
     default:
       throw new Error(`Unknown tool: ${name}`);
@@ -453,6 +511,71 @@ async function handleDeleteNotification(args: any) {
         {
           type: "text",
           text: `Error deleting notification: ${err.message}`,
+        },
+      ],
+    };
+  }
+}
+
+async function handleSkipNotification(args: any) {
+  if (!cosmosClient || !process.env.COSMOS_DATABASE || !process.env.COSMOS_CONTAINER) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: "CosmosDB not configured. Please set COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE, and COSMOS_CONTAINER in .env",
+        },
+      ],
+    };
+  }
+
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const container = database.container(process.env.COSMOS_CONTAINER);
+
+    // Query to find the notification first
+    const query = {
+      query: "SELECT * FROM c WHERE c.id = @id",
+      parameters: [{ name: "@id", value: args.notification_id }]
+    };
+    
+    const { resources } = await container.items.query(query).fetchAll();
+    
+    if (!resources || resources.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Notification ${args.notification_id} not found. It may have been already processed.`,
+          },
+        ],
+      };
+    }
+    
+    const notification = resources[0];
+    
+    // Mark as processed without creating a task
+    notification.processed = true;
+    notification.processed_at = new Date().toISOString();
+    notification.skip_reason = args.reason;
+    
+    // Update with partition key
+    await container.item(notification.id, notification.polihack).replace(notification);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Notification ${args.notification_id} skipped successfully. Reason: ${args.reason}`,
+        },
+      ],
+    };
+  } catch (err: any) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error skipping notification: ${err.message}`,
         },
       ],
     };
@@ -759,6 +882,82 @@ async function handleGetTasksByFilter(args: any) {
       {
         type: "text",
         text: JSON.stringify(result.recordset, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleGetTasksForLocation(args: any) {
+  const limit = args.limit || 10;
+  
+  const request = pool!.request();
+  request.input('limit', sql.Int, limit);
+  
+  // Get tasks that don't have location data yet
+  const result = await request.query(`
+    SELECT TOP (@limit) t.id, t.title, t.description, t.category, t.priority, t.status, t.created_at
+    FROM Tasks t
+    LEFT JOIN TaskLocations tl ON t.id = tl.task_id
+    WHERE t.is_deleted = 0 
+      AND t.status != 'completed'
+      AND tl.task_id IS NULL
+    ORDER BY t.created_at DESC
+  `);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          count: result.recordset.length,
+          tasks: result.recordset
+        }, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleGenerateSearchQuery(args: any) {
+  const { task_id, search_query } = args;
+  
+  if (!task_id || !search_query) {
+    throw new Error('task_id and search_query are required');
+  }
+
+  const request = pool!.request();
+  request.input('task_id', sql.UniqueIdentifier, task_id);
+  request.input('search_query', sql.NVarChar(255), search_query);
+  request.input('updated_at', sql.DateTime2(7), new Date());
+
+  // Store the search query in the Tasks table (add search_query column if needed)
+  // For now, store it in description or create a new column
+  await request.query(`
+    UPDATE Tasks 
+    SET updated_at = @updated_at
+    WHERE id = @task_id
+  `);
+
+  // Insert a marker in TaskLocations to indicate query has been generated
+  await request.query(`
+    INSERT INTO TaskLocations (
+      task_id, name, address, latitude, longitude, 
+      place_id, rating, is_open, distance_meters
+    ) VALUES (
+      @task_id, 'SEARCH_QUERY_GENERATED', @search_query, 0, 0, 
+      'PENDING_LOCATION_SYNC', 0, 0, 0
+    )
+  `);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          success: true,
+          task_id,
+          search_query,
+          message: `Search query "${search_query}" generated for task ${task_id}. Will be used on next location sync.`
+        }, null, 2),
       },
     ],
   };

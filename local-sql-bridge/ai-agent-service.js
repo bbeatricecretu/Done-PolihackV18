@@ -381,40 +381,89 @@ IMPORTANT PRIORITY ORDER:
 
 NOTIFICATION ANALYSIS GUIDELINES:
 
-**CRITICAL: Most notifications should be IGNORED. Only create tasks for EXPLICIT, DIRECT action requests.**
+**CRITICAL GUARDRAILS: 99% of notifications should be IGNORED. Only create tasks for EXPLICIT, DIRECT action requests that the USER must do.**
 
-**Always ignore these types:**
-- Social media notifications (likes, comments, follows)
-- Promotional messages and ads
-- **Chat messages without EXPLICIT actionable content**
-- **Unread message counters** ("X unread messages", "Y new messages")
-- **Questions from others** (someone asking YOU something - not your task to do)
-- System notifications (app updates, battery warnings)
-- News alerts and headlines
-- Generic "Someone sent you a message" without context
-- **Stories or past-tense narration** ("I went to the store", "I bought groceries", "I met with the team")
-- **Casual conversation or chatter** without a future action request
-- **Informational messages** (status updates, FYI, sharing information)
+**MANDATORY IGNORE LIST (Never create tasks for these):**
+
+1. **System & Device Notifications:**
+   - Battery status ("Charging complete", "Low battery", "Battery fully charged")
+   - System updates ("Update available", "Software update ready")
+   - Connectivity ("WiFi connected", "Bluetooth paired")
+   - Storage ("Storage full", "Low storage")
+   - Security ("New login detected", "Password changed")
+
+2. **Message Counters & Badges:**
+   - "X unread messages" / "Y new messages"
+   - "49 messages from 2 chats"
+   - "New message from [person]"
+   - "Someone sent you a message"
+   - Any notification that is just counting unread items
+
+3. **Questions from Others:**
+   - "When is the deadline?" (they're asking, not telling you to do something)
+   - "What time is the meeting?" (question directed at you)
+   - "Can you send me the file?" (request for you to answer, not a task assignment)
+   - "Do you have the document?" (inquiry, not directive)
+   - "Pana la ce ora se pot incarca maine prezentările?" (someone asking you for info)
+
+4. **Social Media Engagement:**
+   - Likes, comments, follows, shares
+   - "X liked your post"
+   - "Y commented on your photo"
+   - "Z started following you"
+
+5. **Past Tense / Already Completed:**
+   - "I went to the store" (already done)
+   - "Just finished the meeting" (completed)
+   - "I bought milk today" (past action)
+   - "Meeting ended" (already over)
+
+6. **Third-Party Actions/Needs:**
+   - "I need to go to the store" (someone else's need)
+   - "She has to call the dentist" (not your task)
+   - "He needs to buy groceries" (someone else's task)
+   - Stories about what others are doing
+
+7. **Informational/Status Updates:**
+   - News headlines
+   - Weather updates (unless explicitly requesting an action)
+   - Stock prices
+   - Sports scores
+   - Promotional ads
+   - "FYI" messages
+
+8. **Casual Conversation:**
+   - General chat without action request
+   - Greetings ("Hi", "Hello", "Good morning")
+   - Acknowledgments ("OK", "Thanks", "Got it")
+   - Emotional expressions without actionable content
 
 **Examples of what to IGNORE:**
+- IGNORE: "Charging complete" (battery notification)
+- IGNORE: "85% battery charged" (system status)
 - IGNORE: "49 messages from 2 chats" (message counter)
 - IGNORE: "X unread messages" (notification badge)
-- IGNORE: "Pana la ce ora se pot incarca maine prezentările?" (someone asking you a question - they need to find out, not you)
+- IGNORE: "New message from John" (message alert without content)
+- IGNORE: "Pana la ce ora se pot incarca maine prezentările?" (question from someone else)
 - IGNORE: "When is the deadline?" (question, not a task)
-- IGNORE: "I went to the store today and bought milk" (past tense, already done)
-- IGNORE: "Just finished my meeting with the CEO" (completed action)
-- IGNORE: "Someone told me about going to the dentist" (third-party story)
-- IGNORE: "I need to go to the store" (someone else talking about their own needs)
-- IGNORE: "She needs to buy groceries" (third-party needs)
-- IGNORE: "He said he has to call the dentist" (someone else's task)
+- IGNORE: "Can you check the document?" (question/request for response, not a clear task)
+- IGNORE: "I went to the store today" (past tense, completed)
+- IGNORE: "Just finished my meeting" (already done)
+- IGNORE: "She needs to buy groceries" (third-party need)
+- IGNORE: "Update available for WhatsApp" (system notification)
+- IGNORE: "Low storage space" (device warning)
 
-**Examples of what to CREATE:**
-- CREATE: "Remind me to buy milk" (explicit request directed at user)
-- CREATE: "You need to go to the store" (task directed at user)
-- CREATE: "Meeting with CEO tomorrow at 10am" (user's future event)
-- CREATE: "Don't forget to call mom" (directive/reminder for user)
-- CREATE: "Clean the toilet tomorrow night" (explicit task with deadline)
-- CREATE: "Submit the presentation by Friday" (direct action with deadline)
+**Examples of what to CREATE (ONLY these types):**
+- CREATE: "Remind me to buy milk" (explicit self-reminder)
+- CREATE: "YOU need to go to the store" (task directly assigned to YOU)
+- CREATE: "Meeting with CEO tomorrow at 10am" (YOUR scheduled event)
+- CREATE: "Don't forget to call mom" (directive/reminder for YOU)
+- CREATE: "Clean the toilet tomorrow night" (YOUR explicit task with deadline)
+- CREATE: "Submit the presentation by Friday" (YOUR direct action with deadline)
+- CREATE: "Buy groceries this evening" (YOUR future action)
+- CREATE: "Call dentist to schedule appointment" (YOUR action to do)
+
+**Key Requirement: The notification must be directing the USER to do something specific in the future.**
 
 **Key indicators of NON-actionable content:**
 - Past tense verbs (went, bought, finished, told, saw)
@@ -579,19 +628,20 @@ For each notification:
 2. **Check "recentContext"**: If there are previous notifications from the same source/author, this might be an update/cancellation
 
 3. **Decide the action**:
-   - CREATE: New task (no duplicate found, not related to previous notifications)
+   - CREATE: New task (no duplicate found, not related to previous notifications, AND is a direct action request)
+   - SKIP: Not task-worthy (battery/system notifications, message counters, questions, casual chat, etc.) OR duplicate of existing pending task
    - EDIT: Update existing duplicate/similar task OR modification from same author
    - DELETE: Cancel/remove task
    - COMPLETE: Mark task as done
-   - IGNORE: Not task-worthy OR duplicate of existing pending task
 
-4. **Call the appropriate MCP tool**:
-   - create_task_from_notification() - for new tasks
+4. **Call the appropriate tool** (CRITICAL - DO NOT create tasks for notifications you want to ignore):
+   - skip_notification() - **USE THIS for notifications that should NOT create tasks** (battery alerts, message counters, questions from others, duplicates, casual chat, etc.)
+   - create_task_from_notification() - ONLY for explicit, direct action requests
    - edit_task() - for updates (you MUST provide the task ID from the existing tasks)
    - delete_task() - for cancellations
    - mark_task_complete() - for completions
 
-5. **Always call delete_notification()** for each notification after processing
+5. **IMPORTANT**: If a notification does NOT meet the strict criteria for task creation, call skip_notification() with a reason. DO NOT create a task with title "Analyze and ignore notification" - that defeats the purpose!
 
 DUPLICATE DETECTION EXAMPLES:
 - Existing: "Team meeting at 2pm Friday"
@@ -630,6 +680,21 @@ Process all notifications now, checking for duplicates first.`;
                 notification_id: { type: "string", description: "Notification ID" }
               },
               required: ["title", "category", "priority", "source_app", "notification_id"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "skip_notification",
+            description: "Skip/ignore a notification that does NOT require task creation. Use this for: battery notifications, message counters, system alerts, questions from others, past-tense actions, casual chat, or any notification that is not a direct action request.",
+            parameters: {
+              type: "object",
+              properties: {
+                notification_id: { type: "string", description: "Notification ID to skip" },
+                reason: { type: "string", description: "Brief reason for skipping (e.g., 'battery notification', 'message counter', 'not actionable', 'casual conversation')" }
+              },
+              required: ["notification_id", "reason"]
             }
           }
         },
@@ -745,6 +810,9 @@ Process all notifications now, checking for duplicates first.`;
       
       try {
         switch (functionName) {
+          case 'skip_notification':
+            await this.skipNotification(args);
+            break;
           case 'create_task_from_notification':
             await this.createTask(args);
             break;
@@ -758,6 +826,18 @@ Process all notifications now, checking for duplicates first.`;
         console.error(`[AI Agent] Error executing ${functionName}:`, error);
       }
     }
+  }
+
+  /**
+   * Skip a notification without creating a task
+   */
+  async skipNotification(params) {
+    console.log(`[AI Agent] 🚫 Skipping notification ${params.notification_id}: ${params.reason}`);
+    
+    // Mark notification as processed
+    await this.markNotificationProcessed(params.notification_id);
+    
+    console.log(`[AI Agent] ✅ Notification ${params.notification_id} skipped and marked as processed`);
   }
 
   /**
@@ -899,6 +979,150 @@ Process all notifications now, checking for duplicates first.`;
     } catch (error) {
       console.error('[AI Agent] Error cleaning up notifications:', error);
       return { deleted: 0, error: error.message };
+    }
+  }
+
+  /**
+   * Generate search queries for tasks that need location data
+   */
+  async generateSearchQueriesForTasks(limit = 5) {
+    try {
+      console.log('\n========== AI AGENT SEARCH QUERY GENERATION ==========');
+      
+      // 1. Get tasks without location data from SQL directly
+      const sql = require('mssql');
+      const request = new sql.Request();
+      request.input('limit', sql.Int, limit);
+      
+      const result = await request.query(`
+        SELECT TOP (@limit) t.id, t.title, t.description, t.category, t.priority, t.status, t.created_at
+        FROM Tasks t
+        LEFT JOIN TaskLocations tl ON t.id = tl.task_id
+        WHERE t.is_deleted = 0 
+          AND t.status != 'completed'
+          AND tl.task_id IS NULL
+        ORDER BY t.created_at DESC
+      `);
+      
+      const tasks = result.recordset || [];
+      
+      if (tasks.length === 0) {
+        console.log('[AI Agent] No tasks need location data');
+        return { processed: 0, message: 'No tasks to process' };
+      }
+
+      console.log(`[AI Agent] Found ${tasks.length} tasks needing search queries`);
+
+      // 2. For each task, ask agent to generate optimal search query
+      let generated = 0;
+      for (const task of tasks) {
+        console.log(`[AI Agent] Generating search query for: "${task.title}"`);
+        
+        const systemPrompt = `You are a search query optimization assistant. Your job is to generate the BEST Google Maps/Places API search query for a given task.
+
+RULES:
+- Analyze the task title, description, and category
+- Generate a short, specific search term (1-3 words)
+- Focus on place types, not actions
+- Examples: "grocery store", "pharmacy", "gas station", "coffee shop"
+- Do NOT include verbs like "buy", "get", "find"
+- Do NOT include quantities or specific items
+- Be concise and clear
+
+You MUST call the function generate_search_query_for_task with your optimized query.`;
+
+        const userPrompt = `Task: "${task.title}"
+Description: "${task.description || 'N/A'}"
+Category: ${task.category || 'N/A'}
+
+Generate the best Google Maps search query for this task.`;
+
+        const tools = [
+          {
+            type: "function",
+            function: {
+              name: "generate_search_query_for_task",
+              description: "Store the optimized search query for a task",
+              parameters: {
+                type: "object",
+                properties: {
+                  task_id: { type: "string", description: "Task UUID" },
+                  search_query: { type: "string", description: "Optimized search query (e.g., 'grocery store', 'pharmacy')" }
+                },
+                required: ["task_id", "search_query"]
+              }
+            }
+          }
+        ];
+
+        try {
+          const fetch = (await import('node-fetch')).default;
+          const response = await fetch(`${this.agentEndpoint}/openai/deployments/${this.agentDeploymentName}/chat/completions?api-version=2024-08-01-preview`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'api-key': this.agentApiKey
+            },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              tools: tools,
+              tool_choice: { type: "function", function: { name: "generate_search_query_for_task" } },
+              temperature: 0.3, // Lower temperature for more consistent results
+              max_tokens: 500
+            })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[AI Agent] API Error:', response.status, errorText);
+            continue;
+          }
+
+          const agentResponse = await response.json();
+          const message = agentResponse.choices?.[0]?.message;
+          
+          if (message?.tool_calls && message.tool_calls.length > 0) {
+            const toolCall = message.tool_calls[0];
+            const args = JSON.parse(toolCall.function.arguments);
+            const searchQuery = args.search_query;
+            
+            // Store the search query in TaskLocations as a marker
+            const sql = require('mssql');
+            const request = new sql.Request();
+            request.input('task_id', sql.UniqueIdentifier, task.id);
+            request.input('search_query', sql.NVarChar(255), searchQuery);
+            
+            await request.query(`
+              INSERT INTO TaskLocations (
+                task_id, name, address, latitude, longitude, 
+                place_id, rating, is_open, distance_meters
+              ) VALUES (
+                @task_id, 'SEARCH_QUERY_GENERATED', @search_query, 0, 0, 
+                'PENDING_LOCATION_SYNC', 0, 0, 0
+              )
+            `);
+            
+            console.log(`[AI Agent] ✅ Generated query "${searchQuery}" for task ${task.id}`);
+            generated++;
+          } else {
+            console.log(`[AI Agent] ⚠️ No tool call returned for task ${task.id}`);
+          }
+        } catch (error) {
+          console.error(`[AI Agent] Error generating query for task ${task.id}:`, error.message);
+        }
+      }
+
+      console.log(`[AI Agent] Search query generation complete: ${generated}/${tasks.length}`);
+      console.log('======================================================\n');
+
+      return { processed: tasks.length, generated };
+
+    } catch (error) {
+      console.error('[AI Agent] Search query generation error:', error);
+      return { processed: 0, generated: 0, error: error.message };
     }
   }
 
