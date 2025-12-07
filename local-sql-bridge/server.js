@@ -65,6 +65,120 @@ async function connectToDb() {
 
 connectToDb();
 
+// Execute MCP Tool Function
+async function executeMCPTool(toolName, args) {
+  console.log(`[MCP] Executing tool: ${toolName}`);
+  
+  const pool = await sql.connect(sqlConfig);
+  
+  switch (toolName) {
+    case 'create_task_from_chat':
+      const taskId = crypto.randomUUID();
+      await pool.request()
+        .input('id', sql.VarChar(50), taskId)
+        .input('title', sql.NVarChar(200), args.title)
+        .input('description', sql.NVarChar(sql.MAX), args.description || '')
+        .input('category', sql.VarChar(50), args.category || 'general')
+        .input('priority', sql.VarChar(20), args.priority || 'medium')
+        .input('due_date', sql.DateTime, args.due_date ? new Date(args.due_date) : null)
+        .input('location_dependent', sql.Bit, args.location_dependent || false)
+        .input('weather_dependent', sql.Bit, args.weather_dependent || false)
+        .input('time_dependent', sql.Bit, args.time_dependent || false)
+        .input('completed', sql.Bit, false)
+        .input('deleted', sql.Bit, false)
+        .query(`INSERT INTO Tasks (id, title, description, category, priority, due_date, location_dependent, weather_dependent, time_dependent, completed, deleted, created_at, updated_at)
+                VALUES (@id, @title, @description, @category, @priority, @due_date, @location_dependent, @weather_dependent, @time_dependent, @completed, @deleted, GETDATE(), GETDATE())`);
+      return { id: taskId, title: args.title, message: 'Task created successfully' };
+      
+    case 'get_all_tasks':
+      const status = args.status || 'all';
+      let query = 'SELECT * FROM Tasks WHERE deleted = 0';
+      if (status === 'pending') query += ' AND completed = 0';
+      if (status === 'completed') query += ' AND completed = 1';
+      if (args.category) query += ` AND category = '${args.category}'`;
+      if (args.priority) query += ` AND priority = '${args.priority}'`;
+      query += ' ORDER BY created_at DESC';
+      if (args.limit) query += ` OFFSET 0 ROWS FETCH NEXT ${args.limit} ROWS ONLY`;
+      
+      const allTasksResult = await pool.request().query(query);
+      return { tasks: allTasksResult.recordset, count: allTasksResult.recordset.length };
+      
+    case 'search_tasks':
+      const searchQuery = `SELECT * FROM Tasks WHERE deleted = 0 AND (title LIKE '%${args.query}%' OR description LIKE '%${args.query}%')`;
+      const searchResult = await pool.request().query(searchQuery);
+      return { tasks: searchResult.recordset, count: searchResult.recordset.length };
+      
+    case 'mark_task_complete':
+      await pool.request()
+        .input('id', sql.VarChar(50), args.id)
+        .query('UPDATE Tasks SET completed = 1, completed_at = GETDATE(), updated_at = GETDATE() WHERE id = @id');
+      return { id: args.id, message: 'Task marked as complete' };
+      
+    case 'delete_task':
+      await pool.request()
+        .input('id', sql.VarChar(50), args.id)
+        .query('UPDATE Tasks SET deleted = 1, updated_at = GETDATE() WHERE id = @id');
+      return { id: args.id, message: 'Task deleted' };
+      
+    case 'edit_task':
+      let updateQuery = 'UPDATE Tasks SET updated_at = GETDATE()';
+      if (args.title) updateQuery += `, title = '${args.title}'`;
+      if (args.description) updateQuery += `, description = '${args.description}'`;
+      if (args.priority) updateQuery += `, priority = '${args.priority}'`;
+      if (args.category) updateQuery += `, category = '${args.category}'`;
+      if (args.due_date) updateQuery += `, due_date = '${args.due_date}'`;
+      updateQuery += ` WHERE id = '${args.id}'`;
+      
+      await pool.request().query(updateQuery);
+      return { id: args.id, message: 'Task updated successfully' };
+      
+    case 'get_completed_tasks':
+      let completedQuery = 'SELECT * FROM Tasks WHERE deleted = 0 AND completed = 1';
+      if (args.category) completedQuery += ` AND category = '${args.category}'`;
+      completedQuery += ' ORDER BY completed_at DESC';
+      if (args.limit) completedQuery += ` OFFSET 0 ROWS FETCH NEXT ${args.limit} ROWS ONLY`;
+      
+      const completedResult = await pool.request().query(completedQuery);
+      return { tasks: completedResult.recordset, count: completedResult.recordset.length };
+      
+    case 'get_tasks_summary':
+      const summaryResult = await pool.request().query(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_priority
+        FROM Tasks WHERE deleted = 0
+      `);
+      return summaryResult.recordset[0];
+      
+    case 'bulk_delete_tasks':
+      if (args.task_ids && args.task_ids.length > 0) {
+        const ids = args.task_ids.map(id => `'${id}'`).join(',');
+        await pool.request().query(`UPDATE Tasks SET deleted = 1, updated_at = GETDATE() WHERE id IN (${ids})`);
+        return { deleted_count: args.task_ids.length, message: 'Tasks deleted successfully' };
+      }
+      return { deleted_count: 0, message: 'No tasks to delete' };
+      
+    case 'update_task_status':
+      if (args.task_ids && args.task_ids.length > 0) {
+        const ids = args.task_ids.map(id => `'${id}'`).join(',');
+        const newStatus = args.new_status === 'completed' ? 1 : 0;
+        await pool.request().query(`UPDATE Tasks SET completed = ${newStatus}, updated_at = GETDATE() WHERE id IN (${ids})`);
+        return { updated_count: args.task_ids.length, message: 'Tasks status updated' };
+      }
+      return { updated_count: 0, message: 'No tasks to update' };
+      
+    case 'get_tasks_by_date':
+      let dateQuery = 'SELECT * FROM Tasks WHERE deleted = 0';
+      const dateResult = await pool.request().query(dateQuery);
+      return { tasks: dateResult.recordset, count: dateResult.recordset.length };
+      
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -829,12 +943,39 @@ app.post('/api/chat/message', async (req, res) => {
     await chatContainer.items.create(assistantMessageDoc);
     console.log('[Chat] ✅ Stored assistant message directly in Cosmos DB');
     
-    // 5. Execute tool calls if any (MCP tools will handle their own data operations)
+    // 5. Execute tool calls immediately and provide feedback
+    let executionResults = [];
     if (agentResult.tool_calls && agentResult.tool_calls.length > 0) {
-      console.log(`[Chat] AI suggested ${agentResult.tool_calls.length} tool calls (for reference only)`);
-      agentResult.tool_calls.forEach(call => {
-        console.log(`  - ${call.function.name}: ${call.function.arguments}`);
-      });
+      console.log(`[Chat] Executing ${agentResult.tool_calls.length} tool calls immediately`);
+      
+      for (const toolCall of agentResult.tool_calls) {
+        try {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          
+          console.log(`[Chat] Executing: ${functionName}`, functionArgs);
+          
+          // Execute the tool via MCP
+          const toolResult = await executeMCPTool(functionName, functionArgs);
+          
+          executionResults.push({
+            tool: functionName,
+            args: functionArgs,
+            success: true,
+            result: toolResult
+          });
+          
+          console.log(`[Chat] ✅ ${functionName} executed successfully`);
+        } catch (error) {
+          console.error(`[Chat] ❌ Error executing ${toolCall.function.name}:`, error.message);
+          executionResults.push({
+            tool: toolCall.function.name,
+            args: JSON.parse(toolCall.function.arguments),
+            success: false,
+            error: error.message
+          });
+        }
+      }
     }
     
     console.log('============================================\n');
@@ -845,7 +986,8 @@ app.post('/api/chat/message', async (req, res) => {
       user_message_id: userMessageDoc.id,
       assistant_message_id: assistantMessageDoc.id,
       response: assistantMessage,
-      tool_calls: agentResult.tool_calls || []
+      tool_calls: agentResult.tool_calls || [],
+      execution_results: executionResults
     });
     
   } catch (error) {

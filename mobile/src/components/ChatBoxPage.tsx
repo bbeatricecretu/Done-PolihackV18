@@ -15,7 +15,11 @@ interface Message {
   time: string;
 }
 
-export function ChatBoxPage() {
+interface ChatBoxPageProps {
+  onTasksUpdate?: () => void;
+}
+
+export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatId, setChatId] = useState<string>('');
@@ -138,6 +142,20 @@ export function ChatBoxPage() {
           };
           
           setMessages(prev => [...prev, assistantMessage]);
+          
+          // If tool calls were executed, notify parent to refresh tasks
+          if (data.execution_results && data.execution_results.length > 0) {
+            console.log('[Chat] Tool execution results:', data.execution_results);
+            
+            // Show execution feedback
+            const successfulExecutions = data.execution_results.filter((r: any) => r.success);
+            if (successfulExecutions.length > 0 && onTasksUpdate) {
+              // Delay to allow DB to update
+              setTimeout(() => {
+                onTasksUpdate();
+              }, 500);
+            }
+          }
         } else {
           // Error response
           const errorMessage: Message = {

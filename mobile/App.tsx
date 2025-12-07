@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, StatusBar, Alert } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from './src/components/Navbar';
@@ -27,6 +27,7 @@ import { syncLocation } from './src/services/CloudSync';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings' | 'locations'>('home');
+  const chatBoxRef = useRef<any>(null);
   const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([
@@ -242,8 +243,6 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
           onDeleteTask={deleteTask}
           onEditTask={editTask}
         />;
-      case 'chat':
-        return <ChatBoxPage />;
       case 'tasks':
         return <TasksPage 
           tasks={tasks}
@@ -262,6 +261,9 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
         />;
       case 'settings':
         return <SettingsPage onSync={syncWithServer} />;
+      case 'chat':
+        // Return null for chat since it's always mounted
+        return null;
       default:
         return <HomePage 
           onNavigate={(page) => setCurrentPage(page)} 
@@ -285,6 +287,14 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
           {/* Page content */}
           <View style={styles.content}>
             {renderPage()}
+          </View>
+
+          {/* ChatBoxPage - Always mounted, shown/hidden based on currentPage */}
+          <View style={[styles.chatContainer, currentPage === 'chat' ? styles.chatVisible : styles.chatHidden]}>
+            <ChatBoxPage onTasksUpdate={() => {
+              // Reload tasks when chat creates/modifies them
+              syncWithServer();
+            }} />
           </View>
           
           {/* Bottom navbar */}
@@ -327,6 +337,20 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     overflow: 'hidden',
+  },
+  chatContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  chatVisible: {
+    display: 'flex',
+  },
+  chatHidden: {
+    display: 'none',
   },
   devButton: {
     position: 'absolute',
