@@ -79,7 +79,7 @@ function AppContent() {
     initializeApp();
 
     // 3. Set Intervals
-    const locationInterval = setInterval(syncUserLocation, 60000); // 60s
+    const locationInterval = setInterval(syncUserLocation, 10000); // 10s
     const tasksInterval = setInterval(syncTasks, 5000); // 5s
 
     return () => {
