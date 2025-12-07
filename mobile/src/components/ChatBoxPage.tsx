@@ -123,12 +123,15 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
 
       try {
         const backendUrl = await getBackendUrl();
+        const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        
         const response = await fetch(`${backendUrl}/api/chat/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: chatId,
-            message: userMessage
+            message: userMessage,
+            timezone: deviceTimezone
           })
         });
 

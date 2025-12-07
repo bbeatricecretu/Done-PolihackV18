@@ -17,17 +17,17 @@ class ChatAgentService {
   /**
    * System prompt with STRICT TASK-ONLY GUARDRAILS
    */
-  getSystemPrompt() {
-    // Get current date and time
+  getSystemPrompt(deviceTimezone = 'UTC') {
+    // Get current date and time in device timezone
     const now = new Date();
-    const today = now.toISOString().split('T')[0]; // "2025-12-07"
-    const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
-    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const currentTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const today = now.toLocaleDateString('en-US', { timeZone: deviceTimezone }).split('/').reverse().join('-'); // Convert to YYYY-MM-DD
+    const tomorrow = new Date(now.getTime() + 86400000).toLocaleDateString('en-US', { timeZone: deviceTimezone }).split('/').reverse().join('-');
+    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: deviceTimezone });
+    const currentTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: deviceTimezone });
     
     return `You are a task management assistant. Your ONLY purpose is to help users manage their tasks.
 
-📅 CURRENT DATE & TIME CONTEXT:
+📅 CURRENT DATE & TIME CONTEXT (Device Timezone: ${deviceTimezone}):
 - Today is: ${today} (${dayOfWeek})
 - Tomorrow is: ${tomorrow}
 - Current time: ${currentTime}
@@ -170,7 +170,7 @@ REMEMBER:
   /**
    * Process a chat message with the AI agent
    */
-  async processChatMessage(chatId, userMessage, conversationHistory = []) {
+  async processChatMessage(chatId, userMessage, conversationHistory = [], deviceTimezone = 'UTC') {
     if (!this.agentEndpoint || !this.agentApiKey) {
       return {
         success: false,
@@ -183,7 +183,7 @@ REMEMBER:
       const messages = [
         {
           role: 'system',
-          content: this.getSystemPrompt()
+          content: this.getSystemPrompt(deviceTimezone)
         }
       ];
 

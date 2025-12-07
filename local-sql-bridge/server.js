@@ -892,7 +892,7 @@ app.post('/api/chat/message', async (req, res) => {
   console.log('\n========== CHAT MESSAGE RECEIVED ==========');
   console.log('Request body:', JSON.stringify(req.body, null, 2));
   
-  const { chat_id, message } = req.body;
+  const { chat_id, message, timezone } = req.body;
   
   if (!chat_id || !message) {
     console.log('ERROR: Missing chat_id or message');
@@ -940,7 +940,8 @@ app.post('/api/chat/message', async (req, res) => {
     console.log(`[Chat] Retrieved ${conversationHistory.length} previous messages from Cosmos DB`);
     
     // 3. Process with AI agent (AI only generates response, doesn't store anything)
-    const agentResult = await chatAgent.processChatMessage(chat_id, message, conversationHistory);
+    const deviceTimezone = timezone || 'UTC'; // Use device timezone or fallback to UTC
+    const agentResult = await chatAgent.processChatMessage(chat_id, message, conversationHistory, deviceTimezone);
     
     if (!agentResult.success) {
       throw new Error(agentResult.error || 'Agent processing failed');
