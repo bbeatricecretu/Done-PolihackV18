@@ -46,55 +46,6 @@ interface LocationsPageProps {
   onUpdateLocation: (location: SavedLocation) => void;
 }
 
-interface SelectionModalProps {
-  visible: boolean;
-  title: string;
-  options: string[];
-  selectedOptions: string[];
-  onClose: () => void;
-  onSelect: (option: string) => void;
-}
-
-function SelectionModal({ visible, title, options, selectedOptions, onClose, onSelect }: SelectionModalProps) {
-  return (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{title}</Text>
-                <TouchableOpacity onPress={onClose}>
-                  <X size={24} color="#9ca3af" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.modalScroll}>
-                {options.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={styles.modalOption}
-                    onPress={() => onSelect(option)}
-                  >
-                    <Text style={styles.modalOptionText}>{option}</Text>
-                    <View style={[styles.checkbox, selectedOptions.includes(option) && styles.checkboxChecked]}>
-                      {selectedOptions.includes(option) && <Check size={12} color="white" />}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-}
-
 interface LocationPickerModalProps {
   visible: boolean;
   mode: 'add' | 'edit';
@@ -300,9 +251,25 @@ function MapPickerModal({ visible, initialRegion, onClose, onConfirm }: MapPicke
 
 export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLocation }: LocationsPageProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['All']);
-  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [showUserLocation, setShowUserLocation] = useState(true);
+
+  useEffect(() => {
+    // Initialize with all locations selected
+    if (savedLocations.length > 0 && selectedLocationIds.length === 0) {
+        setSelectedLocationIds(savedLocations.map(l => l.id));
+    }
+  }, []);
+
+  const toggleLocationSelection = (id: string) => {
+    setSelectedLocationIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(locId => locId !== id)
+        : [...prev, id]
+    );
+  };
 
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerMode, setPickerMode] = useState<'add' | 'edit'>('add');
@@ -311,6 +278,7 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
   const [tempTitle, setTempTitle] = useState('');
   const [isLocationsExpanded, setIsLocationsExpanded] = useState(false);
   const [isTasksExpanded, setIsTasksExpanded] = useState(false);
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
 
   const categories = ['All', 'Shopping', 'Personal', 'Social', 'Work'];
@@ -435,7 +403,12 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Your locations</Text>
         <TouchableOpacity onPress={handleAddPress} style={styles.addButton}>
-          <Plus size={24} color="#4b5563" />
+          <LinearGradient
+            colors={['#d8b4fe', '#c084fc', '#a855f7']}
+            style={styles.addButtonGradient}
+          >
+            <Plus size={24} color="white" />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -456,40 +429,80 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
 
           {isLocationsExpanded && (
             <View style={{ marginTop: 12 }}>
-              {savedLocations.map((loc) => (
-                <TouchableOpacity key={loc.id} style={styles.locationItem} onPress={() => handleEditPress(loc)}>
-                  <Text style={styles.locationLabel}>{loc.name}: </Text>
-                  <Text style={styles.locationValue} numberOfLines={1}>{loc.address || 'Set location'}</Text>
+              {/* Current Location Toggle */}
+              <View style={styles.locationItem}>
+                <TouchableOpacity 
+                  onPress={() => setShowUserLocation(!showUserLocation)}
+                  style={{ marginRight: 12, justifyContent: 'center' }}
+                >
+                  <View style={[styles.checkbox, showUserLocation && styles.checkboxChecked]}>
+                      {showUserLocation && <Check size={12} color="white" />}
+                  </View>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                  onPress={() => setShowUserLocation(!showUserLocation)}
+                >
+                  <Text style={[styles.locationLabel, { width: 'auto', color: '#4f46e5' }]}>Current Location</Text>
+                </TouchableOpacity>
+              </View>
+
+              {savedLocations.map((loc) => (
+                <View key={loc.id} style={styles.locationItem}>
+                  <TouchableOpacity 
+                    onPress={() => toggleLocationSelection(loc.id)}
+                    style={{ marginRight: 12, justifyContent: 'center' }}
+                  >
+                    <View style={[styles.checkbox, selectedLocationIds.includes(loc.id) && styles.checkboxChecked]}>
+                        {selectedLocationIds.includes(loc.id) && <Check size={12} color="white" />}
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                    onPress={() => handleEditPress(loc)}
+                  >
+                    <Text style={styles.locationLabel}>{loc.name}: </Text>
+                    <Text style={styles.locationValue} numberOfLines={1}>{loc.address || 'Set location'}</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
         </View>
 
         {/* Category Filter */}
-        <View style={styles.filterSection}>
+        <View style={styles.section}>
           <TouchableOpacity 
             style={styles.filterHeader} 
-            onPress={() => setIsCategoryModalVisible(true)}
+            onPress={() => setIsCategoriesExpanded(!isCategoriesExpanded)}
           >
             <Text style={styles.filterTitle}>Choose your category</Text>
-            <ChevronDown size={20} color="#4b5563" />
+            {isCategoriesExpanded ? <ChevronUp size={20} color="#4b5563" /> : <ChevronDown size={20} color="#4b5563" />}
           </TouchableOpacity>
-          <Text style={styles.selectionSummary} numberOfLines={1}>
-            {selectedCategories.join(', ')}
-          </Text>
+          
+          {isCategoriesExpanded ? (
+             <View style={{ marginTop: 12, gap: 8 }}>
+                {categories.map(category => (
+                  <TouchableOpacity 
+                    key={category} 
+                    style={styles.taskRow}
+                    onPress={() => toggleCategory(category)}
+                  >
+                    <View style={[styles.checkbox, selectedCategories.includes(category) && styles.checkboxChecked]}>
+                        {selectedCategories.includes(category) && <Check size={12} color="white" />}
+                    </View>
+                    <Text style={styles.taskTitle}>{category}</Text>
+                  </TouchableOpacity>
+                ))}
+             </View>
+          ) : (
+             <Text style={styles.selectionSummary} numberOfLines={1}>
+                {selectedCategories.join(', ')}
+             </Text>
+          )}
         </View>
-
-
-
-        <SelectionModal
-          visible={isCategoryModalVisible}
-          title="Choose Category"
-          options={categories}
-          selectedOptions={selectedCategories}
-          onClose={() => setIsCategoryModalVisible(false)}
-          onSelect={toggleCategory}
-        />
 
 
 
@@ -537,19 +550,10 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
                 latitudeDelta: 0.0922,
                 longitudeDelta: 0.0421,
               }}
-              showsUserLocation={true}
-              showsMyLocationButton={true}
+              showsUserLocation={showUserLocation}
+              showsMyLocationButton={showUserLocation}
             >
-              {userLocation && (
-                <Marker
-                  coordinate={{
-                    latitude: userLocation.coords.latitude,
-                    longitude: userLocation.coords.longitude,
-                  }}
-                  title="You are here"
-                />
-              )}
-              {savedLocations.map(loc => (
+              {savedLocations.filter(loc => selectedLocationIds.includes(loc.id)).map(loc => (
                 loc.latitude && loc.longitude ? (
                   <Marker
                     key={loc.id}
@@ -606,14 +610,15 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   addButton: {
-    padding: 8,
-    backgroundColor: 'white',
-    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  addButtonGradient: {
+    padding: 8,
+    borderRadius: 12,
   },
   content: {
     flex: 1,
@@ -656,7 +661,7 @@ const styles = StyleSheet.create({
   },
   filterTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#1f2937',
   },
   checkboxGroup: {
@@ -739,21 +744,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1f2937',
-  },
-  modalScroll: {
-    maxHeight: 400,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: '#4b5563',
   },
   taskRow: {
     flexDirection: 'row',
