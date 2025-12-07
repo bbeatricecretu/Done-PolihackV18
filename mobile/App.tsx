@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, StatusBar, Alert } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from './src/components/Navbar';
@@ -18,53 +18,100 @@ import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
+
+// --- MERGED IMPORTS START ---
 import { useFonts, Pacifico_400Regular } from '@expo-google-fonts/pacifico';
 import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
+import { LocationService } from './src/services/LocationService';
+import ProximityNotificationService from './src/services/ProximityNotificationService';
+import { syncLocation } from './src/services/CloudSync';
+// --- MERGED IMPORTS END ---
 
 // Register the Headless Task for background notification listening
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings' | 'locations'>('home');
+  const [currentPage, setCurrentPage] = useState('home');
+  const chatBoxRef = useRef(null);
   const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([
+  const [tasks, setTasks] = useState([]);
+  const [savedLocations, setSavedLocations] = useState([
     { id: '1', name: 'Home', address: 'Cluj-Napoca, Romania', latitude: 46.7712, longitude: 23.6236 },
     { id: '2', name: 'Work', address: 'Cluj Business Center', latitude: 46.7700, longitude: 23.5900 },
   ]);
 
-  // Load tasks from local storage on mount
+  // Global Sync Management (Location & Tasks)
   useEffect(() => {
-    const loadTasks = async () => {
-      // First load local tasks
-      let loadedTasks = await TaskManager.getTasks();
-      
-      // Then try to sync with cloud
+    // 1. Define Sync Functions
+    const syncUserLocation = async () => {
       try {
-        const cloudTasks = await TaskManager.syncWithCloud();
-        if (cloudTasks.length > 0) {
-          loadedTasks = cloudTasks;
+        console.log('[App] Starting global location sync...');
+        const location = await LocationService.getCurrentLocation();
+        if (location) {
+          console.log('[App] Got location:', location.latitude, location.longitude);
+          await syncLocation(location.latitude, location.longitude);
         }
-      } catch (e) {
-        console.error('Initial cloud sync failed', e);
-      }
-
-      if (loadedTasks.length > 0) {
-        setTasks(loadedTasks);
-      } else {
-        // Start with empty list
-        setTasks([]);
-      }
-      
-      // Sync with cloud
-      const currentTasks = await TaskManager.getTasks();
-      if (currentTasks.length > 0) {
-        syncTasksToCloud(currentTasks).catch(err => console.error('Sync failed:', err));
+      } catch (err) {
+        console.error('[App] Error in global location sync:', err);
       }
     };
-    loadTasks();
+
+    const syncTasks = async () => {
+      try {
+        console.log('[App] Syncing tasks from cloud...');
+        const cloudTasks = await TaskManager.syncWithCloud();
+        console.log('[App] Received', cloudTasks.length, 'tasks from sync');
+        setTasks(cloudTasks);
+      } catch (error) {
+        console.error('[App] Failed to sync tasks:', error);
+      }
+    };
+
+    // 2. Initial Load & Sync
+    const initializeApp = async () => {
+      // Load local tasks first for speed
+      const localTasks = await TaskManager.getTasks();
+      setTasks(localTasks);
+
+      // Perform initial syncs
+      await syncTasks();
+      await syncUserLocation();
+      
+      // Push local tasks to cloud to ensure consistency on startup
+      if (localTasks.length > 0) {
+         syncTasksToCloud(localTasks).catch(err => console.error('Initial push failed:', err));
+      }
+    };
+
+    initializeApp();
+
+    // 3. Set Intervals
+    const locationInterval = setInterval(syncUserLocation, 60000); // 60s
+    const tasksInterval = setInterval(syncTasks, 5000); // 5s
+
+    return () => {
+      clearInterval(locationInterval);
+      clearInterval(tasksInterval);
+    };
   }, []);
 
-  const toggleTask = async (id: number) => {
+  // Request location permissions on app launch
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        const granted = await LocationService.requestPermissions();
+        if (!granted) {
+          Alert.alert('Permission Denied', 'Location permission is required for nearby task alerts.');
+        }
+      } catch (e) {
+        console.error('Failed to request location permissions:', e);
+      }
+    };
+    requestPermissions();
+  }, []);
+
+
+
+  const toggleTask = async (id) => {
     const taskToUpdate = tasks.find(t => t.id === id);
     if (taskToUpdate) {
       const isCompleted = !taskToUpdate.completed;
@@ -78,7 +125,7 @@ function AppContent() {
     }
   };
 
-  const addTask = async (newTask: Task) => {
+  const addTask = async (newTask) => {
     // Remove the temporary ID generated by the modal
     const { id, ...taskData } = newTask;
     const savedTask = await TaskManager.addTask(taskData);
@@ -93,7 +140,7 @@ function AppContent() {
     }
   };
 
-  const deleteTask = (id: number) => {
+  const deleteTask = (id) => {
     Alert.alert(
       "Delete Task",
       "Are you sure you want to delete this note?",
@@ -111,17 +158,17 @@ function AppContent() {
     );
   };
 
-  const editTask = async (editedTask: Task) => {
+  const editTask = async (editedTask) => {
     setTasks(tasks.map(t => t.id === editedTask.id ? editedTask : t));
     await TaskManager.updateTask(editedTask);
   };
 
-const addLocation = (location: Omit<SavedLocation, 'id'>) => {
+const addLocation = (location) => {
     const newLocation = { ...location, id: Date.now().toString() };
     setSavedLocations([...savedLocations, newLocation]);
   };
 
-  const updateLocation = (location: SavedLocation) => {
+  const updateLocation = (location) => {
     setSavedLocations(savedLocations.map(loc => loc.id === location.id ? location : loc));
   };
 
@@ -156,6 +203,40 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
     initNotifications();
   }, []);
 
+  // Initialize proximity notification service
+  useEffect(() => {
+    const initProximityNotifications = async () => {
+      try {
+        console.log('[App] Initializing proximity notifications...');
+        const success = await ProximityNotificationService.initialize();
+        
+        if (success) {
+          console.log('[App] Starting proximity notification polling...');
+          ProximityNotificationService.startPolling();
+          
+          // Handle notification taps (optional: navigate to task)
+          ProximityNotificationService.addNotificationResponseListener((response) => {
+            const taskId = response.notification.request.content.data?.task_id;
+            if (taskId) {
+              console.log('[App] User tapped proximity notification for task:', taskId);
+              // Navigate to tasks page
+              setCurrentPage('tasks');
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[App] Failed to initialize proximity notifications:', error);
+      }
+    };
+
+    initProximityNotifications();
+
+    // Cleanup on unmount
+    return () => {
+      ProximityNotificationService.stopPolling();
+    };
+  }, []);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
@@ -166,8 +247,6 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
           onDeleteTask={deleteTask}
           onEditTask={editTask}
         />;
-      case 'chat':
-        return <ChatBoxPage />;
       case 'tasks':
         return <TasksPage 
           tasks={tasks}
@@ -186,6 +265,9 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
         />;
       case 'settings':
         return <SettingsPage onSync={syncWithServer} />;
+      case 'chat':
+        // Return null for chat since it's always mounted
+        return null;
       default:
         return <HomePage 
           onNavigate={(page) => setCurrentPage(page)} 
@@ -209,6 +291,14 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
           {/* Page content */}
           <View style={styles.content}>
             {renderPage()}
+          </View>
+
+          {/* ChatBoxPage - Always mounted, shown/hidden based on currentPage */}
+          <View style={[styles.chatContainer, currentPage === 'chat' ? styles.chatVisible : styles.chatHidden]}>
+            <ChatBoxPage onTasksUpdate={() => {
+              // Reload tasks when chat creates/modifies them
+              syncWithServer();
+            }} />
           </View>
           
           {/* Bottom navbar */}
@@ -261,6 +351,20 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     overflow: 'hidden',
+  },
+  chatContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  chatVisible: {
+    display: 'flex',
+  },
+  chatHidden: {
+    display: 'none',
   },
   devButton: {
     position: 'absolute',

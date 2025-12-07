@@ -9,6 +9,11 @@ export interface Task {
   priority?: string;
   source?: string;
   location?: string;
+  locationCoordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  locationAddress?: string;
   completedAt?: string;
 }
 

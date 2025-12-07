@@ -54,9 +54,41 @@ export async function testServerConnection(): Promise<{ success: boolean; messag
     if (e.name === 'AbortError') {
       return { success: false, message: 'Connection timed out. Check IP and firewall.' };
     }
-    return { success: false, message: `Error: ${e.message || 'Cannot reach server'}` };
+        return { success: false, message: `Error: ${e.message || 'Cannot reach server'}` };
   }
 }
+
+let lastLocationSyncTime = 0;
+
+export async function syncLocation(latitude: number, longitude: number): Promise<void> {
+  try {
+    const now = Date.now();
+    // Reduced throttle to 45s to ensure the 60s interval always passes
+    if (now - lastLocationSyncTime < 45000) {
+      console.log('[CloudSync] Skipping location sync (throttled)');
+      return;
+    }
+    lastLocationSyncTime = now;
+
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/sync-location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude }),
+    });
+    
+    if (!response.ok) {
+      console.error('[CloudSync] Failed to sync location:', response.status);
+    } else {
+      const data = await response.json();
+      console.log('[CloudSync] Location synced:', data.message);
+    }
+  } catch (error) {
+    console.error('[CloudSync] Error syncing location:', error);
+  }
+}
+
+
 
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {

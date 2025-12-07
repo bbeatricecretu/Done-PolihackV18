@@ -1,11 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { Plus, Search, Check, X, ListFilter } from 'lucide-react-native';
+import { Plus, Search, Check, X, ListFilter, MapPin } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NewMementoModal } from './NewMementoModal';
 import { EditTaskModal } from './EditTaskModal';
 import { FilterTasksModal, FilterState } from './FilterTasksModal';
+import { NearbyPlacesModal } from './NearbyPlacesModal';
 import { Task, SavedLocation } from '../types';
+import { LocalIntelligence } from '../services/LocalIntelligence';
+import { LocationService, PlaceResult } from '../services/LocationService';
+import { syncLocation } from '../services/CloudSync';
 
 interface TasksPageProps {
   tasks: Task[];
@@ -31,6 +35,13 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
     location: null,
   });
 
+  const [nearbyModalVisible, setNearbyModalVisible] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchType, setSearchType] = useState<string | null>(null);
+  const [taskForLocation, setTaskForLocation] = useState<Task | null>(null);
+
+  // Location sync is now handled globally in App.tsx
+
   const handleAddTask = (newTask: Task) => {
     onAddTask(newTask);
   };
@@ -42,6 +53,34 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
   const handleSaveEdit = (editedTask: Task) => {
     onEditTask(editedTask);
     setEditingTask(null);
+  };
+
+  const handleFindNearby = (task: Task) => {
+    const category = task.category || LocalIntelligence.detectCategory(task.title, task.description);
+    const keyword = category || task.title;
+    const type = category ? LocalIntelligence.getPlaceTypeForCategory(category) : null;
+
+    setSearchKeyword(keyword);
+    setSearchType(type);
+    setTaskForLocation(task);
+    setNearbyModalVisible(true);
+  };
+
+  const handlePlaceSelected = (place: PlaceResult) => {
+    if (taskForLocation) {
+      const updatedTask: Task = {
+        ...taskForLocation,
+        location: place.name,
+        locationAddress: place.address,
+        locationCoordinates: {
+          latitude: place.geometry.location.lat,
+          longitude: place.geometry.location.lng
+        }
+      };
+      onEditTask(updatedTask);
+      setNearbyModalVisible(false);
+      setTaskForLocation(null);
+    }
   };
 
   const toggleExpand = (id: number) => {
@@ -135,9 +174,11 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
                   <Text style={[styles.tagText, styles.tagTextGreen]}>from {item.source}</Text>
                 </View>
               )}
+              {/* MERGED: Using the version with MapPin icon and proper styling */}
               {item.location && (
                 <View style={[styles.tag, styles.tagPurple]}>
-                  <Text style={[styles.tagText, styles.tagTextPurple]}>@{item.location}</Text>
+                  <MapPin size={12} color="#7c3aed" />
+                  <Text style={[styles.tagText, styles.tagTextPurple]}>{item.location}</Text>
                 </View>
               )}
             </View>
@@ -162,10 +203,14 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
 
         {isExpanded && (
           <View style={styles.actionsContainer}>
-            <TouchableOpacity onPress={() => handleEdit(item)}>
+            <TouchableOpacity onPress={() => handleFindNearby(item)} style={styles.actionButton}>
+               <MapPin size={16} color="#4b5563" />
+               <Text style={styles.actionText}>Find Nearby</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
               <Text style={styles.actionText}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDeleteTask(item.id)}>
+            <TouchableOpacity onPress={() => onDeleteTask(item.id)} style={styles.actionButton}>
               <Text style={styles.actionText}>Delete</Text>
             </TouchableOpacity>
           </View>
@@ -265,6 +310,14 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
         onSave={handleSaveEdit}
         availableCategories={availableCategories}
         availableSources={availableSources}
+      />
+
+      <NearbyPlacesModal
+        visible={nearbyModalVisible}
+        onClose={() => setNearbyModalVisible(false)}
+        onSelectPlace={handlePlaceSelected}
+        searchKeyword={searchKeyword}
+        searchType={searchType}
       />
     </View>
   );
@@ -414,11 +467,15 @@ const styles = StyleSheet.create({
   tagTextGreen: {
     color: '#15803d', // green-700
   },
+  // MERGED: Styles for location tag that support flex layout for the icon
   tagPurple: {
-    backgroundColor: '#f3e8ff', // purple-100
+    backgroundColor: '#f3e8ff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   tagTextPurple: {
-    color: '#7e22ce', // purple-700
+    color: '#7c3aed',
   },
   dueText: {
     fontSize: 14,
@@ -449,6 +506,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
     gap: 24,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   actionText: {
     fontSize: 14,
