@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, StatusBar, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, StatusBar, Alert, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Navbar } from './src/components/Navbar';
 import { HomePage } from './src/components/HomePage';
@@ -28,6 +28,7 @@ import { syncLocation } from './src/services/CloudSync';
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<'home' | 'chat' | 'tasks' | 'settings' | 'locations'>('home');
   const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
+  const appState = useRef(AppState.currentState);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([
     { id: '1', name: 'Home', address: 'Cluj-Napoca, Romania', latitude: 46.7712, longitude: 23.6236 },
@@ -79,29 +80,65 @@ function AppContent() {
 
     initializeApp();
 
-    // 3. Set Intervals
-    const locationInterval = setInterval(syncUserLocation, 60000); // 60s
-    const tasksInterval = setInterval(syncTasks, 5000); // 5s
+    // 3. Set Intervals with dynamic sync interval based on app state
+    const locationInterval = setInterval(syncUserLocation, 60000); // 60s always
+    let tasksInterval = setInterval(syncTasks, 5000); // Start with 5s (foreground)
+
+    // 4. Listen to AppState changes to adjust sync intervals
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('[App] App has come to the foreground - switching to 5s task sync');
+        // Clear the 60s interval and switch to 5s
+        clearInterval(tasksInterval);
+        tasksInterval = setInterval(syncTasks, 5000);
+        // Immediate sync when returning to foreground
+        syncTasks();
+        syncUserLocation();
+      } else if (nextAppState.match(/inactive|background/)) {
+        console.log('[App] App is going to background - switching to 60s task sync');
+        // Clear the 5s interval and switch to 60s
+        clearInterval(tasksInterval);
+        tasksInterval = setInterval(syncTasks, 60000);
+      }
+      appState.current = nextAppState;
+    });
 
     return () => {
       clearInterval(locationInterval);
       clearInterval(tasksInterval);
+      subscription?.remove();
     };
   }, []);
 
-  // Request location permissions on app launch
+  // Request location permissions and start background tracking on app launch
   useEffect(() => {
     const requestPermissions = async () => {
       try {
         const granted = await LocationService.requestPermissions();
         if (!granted) {
           Alert.alert('Permission Denied', 'Location permission is required for nearby task alerts.');
+          return;
+        }
+
+        // Start background location tracking
+        const backgroundStarted = await LocationService.startBackgroundLocationTracking('BACKGROUND_LOCATION_TASK');
+        if (backgroundStarted) {
+          console.log('[App] Background location tracking started successfully');
+        } else {
+          console.log('[App] Failed to start background location tracking');
         }
       } catch (e) {
         console.error('Failed to request location permissions:', e);
       }
     };
     requestPermissions();
+
+    // Cleanup on unmount
+    return () => {
+      LocationService.stopBackgroundLocationTracking('BACKGROUND_LOCATION_TASK').catch(err => {
+        console.error('[App] Error stopping background location:', err);
+      });
+    };
   }, []);
 
 
