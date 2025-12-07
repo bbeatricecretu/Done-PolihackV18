@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Task } from '../types';
+import { Task, SavedLocation } from '../types';
 
 // Configuration Keys
 const SYNC_KEY = '@memento_last_sync';
@@ -88,21 +88,6 @@ export async function syncLocation(latitude: number, longitude: number): Promise
   }
 }
 
-export async function fetchLocationsFromCloud(): Promise<any[]> {
-  try {
-    const apiBase = await getApiBase();
-    const response = await fetch(`${apiBase}/locations`);
-    if (response.ok) {
-      const locations = await response.json();
-      return locations;
-    }
-    return [];
-  } catch (error) {
-    console.error('[CloudSync] Error fetching locations:', error);
-    return [];
-  }
-}
-
 
 
 function generateUUID() {
@@ -110,11 +95,6 @@ function generateUUID() {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-}
-
-export async function getIdMap(): Promise<Record<number, string>> {
-  const idMapStr = await AsyncStorage.getItem(ID_MAP_KEY);
-  return idMapStr ? JSON.parse(idMapStr) : {};
 }
 
 async function getCloudId(localId: number): Promise<string> {
@@ -350,4 +330,43 @@ export async function syncTasksToCloud(tasks: Task[]) {
 
 export async function getLastSyncTime(): Promise<string | null> {
   return await AsyncStorage.getItem(SYNC_KEY);
+}
+
+// Fetch task-linked locations from the backend and map them to local task IDs
+export async function fetchLocationsFromCloud(): Promise<SavedLocation[]> {
+  try {
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/locations`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch locations from cloud');
+    }
+
+    const cloudLocations = await response.json();
+
+    // Build reverse ID map (cloud UUID -> local numeric ID)
+    const idMapStr = await AsyncStorage.getItem(ID_MAP_KEY);
+    const idMap: Record<number, string> = idMapStr ? JSON.parse(idMapStr) : {};
+    const reverseMap: Record<string, number> = {};
+    Object.entries(idMap).forEach(([localId, cloudId]) => {
+      reverseMap[cloudId] = Number(localId);
+    });
+
+    const mapped: SavedLocation[] = cloudLocations
+      .filter((loc: any) => loc && loc.latitude != null && loc.longitude != null)
+      .map((loc: any) => ({
+        id: String(loc.id || loc.place_id || `${loc.task_id}-${loc.latitude}-${loc.longitude}`),
+        name: loc.name || 'Location',
+        address: loc.address || '',
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        taskId: reverseMap[loc.task_id]
+      }))
+      // Only keep locations we can attach to a local task (ensures task filtering works)
+      .filter((loc: SavedLocation) => loc.taskId !== undefined);
+
+    return mapped;
+  } catch (error) {
+    console.error('[CloudSync] Failed to fetch locations:', error);
+    return [];
+  }
 }

@@ -476,16 +476,35 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
-// Get All Locations
+// Get Locations (optionally filtered by taskId)
 app.get('/api/locations', async (req, res) => {
-  console.log('[GET /api/locations] Fetching all locations...');
+  const { taskId } = req.query;
+  const hasTaskFilter = Boolean(taskId);
+
+  console.log('[GET /api/locations] Fetching locations', hasTaskFilter ? `for task ${taskId}` : 'for all tasks');
+
+  // Validate GUID format early to avoid SQL errors
+  if (hasTaskFilter && !/^[0-9a-fA-F-]{36}$/.test(String(taskId))) {
+    return res.status(400).json({ success: false, error: 'Invalid taskId format' });
+  }
+
   try {
-    const result = await sql.query`
-      SELECT tl.*, t.title as task_title 
+    const request = new sql.Request();
+    let query = `
+      SELECT tl.*, t.title as task_title
       FROM TaskLocations tl
       JOIN Tasks t ON tl.task_id = t.id
       WHERE t.is_deleted = 0
     `;
+
+    if (hasTaskFilter) {
+      request.input('taskId', sql.UniqueIdentifier, taskId);
+      query += ' AND tl.task_id = @taskId';
+    }
+
+    query += '\n      ORDER BY tl.created_at DESC, tl.id DESC';
+
+    const result = await request.query(query);
     console.log(`[GET /api/locations] Returning ${result.recordset.length} locations`);
     res.json(result.recordset);
   } catch (err) {
