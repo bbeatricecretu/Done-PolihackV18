@@ -1022,12 +1022,27 @@ Process all notifications now, checking for duplicates first.`;
 
 RULES:
 - Analyze the task title, description, and category
-- Generate a short, specific search term (1-3 words)
+- **IMPORTANT: If the task mentions a specific business/location name, INCLUDE IT in the search query**
+- Generate a short, specific search term (1-4 words)
 - Focus on place types, not actions
-- Examples: "grocery store", "pharmacy", "gas station", "coffee shop"
-- Do NOT include verbs like "buy", "get", "find"
-- Do NOT include quantities or specific items
+- Examples: 
+  * "grocery store" (generic)
+  * "Lidl supermarket" (if "Lidl" is mentioned in task)
+  * "Cloudflight office" (if "Cloudflight office" is mentioned)
+  * "Starbucks coffee" (if "Starbucks" is mentioned)
+  * "pharmacy" (generic)
+- Do NOT include verbs like "buy", "get", "find", "go to"
+- Do NOT include quantities or specific items to purchase
 - Be concise and clear
+- Preserve proper nouns and brand names
+
+SPECIFIC LOCATION NAME HANDLING:
+- "go to Cloudflight office" → "Cloudflight office"
+- "buy groceries at Lidl" → "Lidl supermarket"
+- "get coffee from Starbucks" → "Starbucks"
+- "visit Rosa restaurant" → "Rosa restaurant"
+- "buy shaorma from Rosa" → "Rosa restaurant"
+- "go to office" → "office" (generic, no specific name)
 
 You MUST call the function generate_search_query_for_task with your optimized query.`;
 

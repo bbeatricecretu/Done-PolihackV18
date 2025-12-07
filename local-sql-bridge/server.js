@@ -542,9 +542,168 @@ app.post('/api/sync-location', async (req, res) => {
         message: `Processed location for ${tasks.length} tasks. Updated locations for ${updatedTasksCount} tasks.` 
     });
 
+    // After successful location sync, update distances and check for nearby tasks
+    await updateDistancesAndNotify(latitude, longitude);
+
   } catch (err) {
     console.error('Sync location error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
+// Update distances in TaskLocations table and send proximity notifications
+async function updateDistancesAndNotify(userLat, userLon) {
+  try {
+    // Get all task locations with valid coordinates
+    const result = await sql.query`
+      SELECT 
+        tl.id as location_id,
+        tl.task_id,
+        tl.name as location_name,
+        tl.address,
+        tl.latitude,
+        tl.longitude,
+        tl.place_id,
+        t.title as task_title,
+        t.description as task_description,
+        t.priority,
+        t.status
+      FROM TaskLocations tl
+      INNER JOIN Tasks t ON tl.task_id = t.id
+      WHERE tl.latitude != 0 
+        AND tl.longitude != 0
+        AND tl.place_id != 'NO_RESULTS'
+        AND tl.place_id != 'PENDING_LOCATION_SYNC'
+        AND t.is_deleted = 0
+        AND t.status = 'pending'
+    `;
+
+    const locations = result.recordset;
+    console.log(`📊 Updating distances for ${locations.length} task locations`);
+
+    // Update each location's distance_meters column
+    for (const loc of locations) {
+      const distance = calculateDistance(
+        userLat, 
+        userLon, 
+        loc.latitude, 
+        loc.longitude
+      );
+
+      const distanceMeters = Math.round(distance);
+
+      // Update the distance in the database
+      const updateRequest = new sql.Request();
+      updateRequest.input('location_id', sql.Int, loc.location_id);
+      updateRequest.input('distance_meters', sql.Int, distanceMeters);
+
+      await updateRequest.query(`
+        UPDATE TaskLocations 
+        SET distance_meters = @distance_meters 
+        WHERE id = @location_id
+      `);
+    }
+
+    // Now query for tasks within 100 meters
+    const nearbyResult = await sql.query`
+      SELECT 
+        tl.task_id,
+        t.title,
+        t.description,
+        t.priority,
+        tl.name as location_name,
+        tl.address,
+        tl.distance_meters,
+        tl.latitude,
+        tl.longitude
+      FROM TaskLocations tl
+      INNER JOIN Tasks t ON tl.task_id = t.id
+      WHERE tl.distance_meters < 100
+        AND tl.distance_meters > 0
+        AND t.is_deleted = 0
+        AND t.status = 'pending'
+      ORDER BY tl.distance_meters ASC
+    `;
+
+    const nearbyTasks = nearbyResult.recordset;
+
+    if (nearbyTasks.length > 0) {
+      console.log(`📍 Found ${nearbyTasks.length} tasks within 100 meters`);
+      
+      // Store notifications for the mobile app to poll
+      global.proximityNotifications = global.proximityNotifications || [];
+      
+      for (const task of nearbyTasks) {
+        console.log(`  → "${task.title}" at ${task.location_name} (${task.distance_meters}m away)`);
+        
+        // Avoid duplicate notifications for the same task within 5 minutes
+        const existingIndex = global.proximityNotifications.findIndex(
+          n => n.task_id === task.task_id && 
+               (Date.now() - n.timestamp < 5 * 60 * 1000)
+        );
+        
+        if (existingIndex === -1) {
+          global.proximityNotifications.push({
+            task_id: task.task_id,
+            title: `📍 Nearby Task: ${task.title}`,
+            body: `You're ${task.distance_meters}m away from ${task.location_name}`,
+            priority: task.priority,
+            distance: task.distance_meters,
+            location_name: task.location_name,
+            timestamp: Date.now(),
+            id: Date.now().toString() + Math.random().toString(36)
+          });
+          console.log(`  ✅ Queued notification for: ${task.title}`);
+        } else {
+          console.log(`  ⏭️  Skipping duplicate notification for: ${task.title}`);
+        }
+      }
+      
+      // Clean up old notifications (older than 10 minutes)
+      global.proximityNotifications = global.proximityNotifications.filter(
+        n => Date.now() - n.timestamp < 10 * 60 * 1000
+      );
+    } else {
+      console.log(`📍 No tasks within 100 meters of current location`);
+    }
+
+  } catch (error) {
+    console.error('Error updating distances and checking proximity:', error);
+  }
+}
+
+// New endpoint for mobile to poll proximity notifications
+app.get('/api/proximity-notifications', async (req, res) => {
+  try {
+    const notifications = global.proximityNotifications || [];
+    
+    // Return all pending notifications and clear them
+    global.proximityNotifications = [];
+    
+    res.json({
+      success: true,
+      notifications: notifications,
+      count: notifications.length
+    });
+  } catch (error) {
+    console.error('Error getting proximity notifications:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -559,6 +718,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  POST /api/sync - Upload tasks from mobile`);
   console.log(`  GET  /api/sync/tasks - Download new tasks to mobile (every 5s)`);
   console.log(`  POST /api/sync-location - Update location & find nearby places`);
+  console.log(`  GET  /api/proximity-notifications - Poll for location-based task alerts`);
   console.log(`  POST /api/process-notifications - Manually trigger AI processing`);
   console.log(`  GET  /api/notification-stats - View notification statistics`);
   
