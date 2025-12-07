@@ -1,69 +1,150 @@
-# Memento - Intelligent Task Management
+# **Done --- The Task Manager That Helps You Focus**
 
-## Overview
+Done is an AI-powered task manager created during **Polihack v18**,
+designed to reduce overwhelm.\
+Instead of dumping dozens of tasks on you, Done highlights only the next
+most important one --- based on context, deadlines, notifications, and
+intelligent filtering.
 
-Memento is an intelligent task management app that automatically captures notifications from your phone and converts them into actionable tasks using AI.
+------------------------------------------------------------------------
 
-## Architecture
+## 🚀 **Why Us**
 
-- **Frontend:** React + Vite (web UI simulator)
-- **Mobile:** React Native + Expo (Android APK with notification access)
-- **Backend:** Node.js + Express (local server)
-- **AI Agent:** Azure AI Foundry (GPT-4o) with custom MCP server
-- **Database:** Azure SQL Database
+Most productivity apps overload users with:
+- too many lists
+- too many notifications
+- too many decisions
 
-## Quick Start
+Done solves the real problem:
+**not information overload --- but timing overload.**
 
-### 1. Start the Backend
+You don't get stressed because you have tasks.
+You get stressed because they hit you at the wrong moment.
 
-```bash
-# Windows
-start_backend.bat
+Done fixes that automatically.
 
-# Or manually
+------------------------------------------------------------------------
+
+# ✨ **Core Features**
+
+## 🏠 1. **Smart Home Page**
+
+The home screen shows:
+- **one** relevant task
+- selected using AI reasoning
+- based on urgency, context, history, and deadlines
+
+You always know what to do next.
+
+------------------------------------------------------------------------
+
+## 💬 2. **AI Chat Box (Azure Agent)**
+
+A conversational assistant that can: 
+- create tasks
+- edit tasks
+- update deadlines
+- delete tasks
+- search and filter
+- understand natural language
+
+Hosted on Azure AI Foundry with a custom MCP server.
+
+------------------------------------------------------------------------
+
+## 📋 3. **Manual Task Management**
+
+For users who want full control: 
+- complete task list
+- sorting and filtering
+- full CRUD
+- clean UI pages
+
+Still aligned with the "one task at a time" philosophy.
+
+------------------------------------------------------------------------
+
+## 🔔 4. **Notification Intelligence**
+
+Done reads your smartphone notifications and transforms them into tasks
+automatically.
+
+The AI can: 
+- detect meaningful reminders
+- merge similar notifications
+- fill in missing information (dates, names, context)
+- avoid duplicates
+
+**Example:**
+Two banking notifications → one clear "Pay rent" task.
+
+------------------------------------------------------------------------
+
+## 📍 5. **Location-Aware Tasks**
+
+After adding a task, Done can: 
+- search Google Maps API
+- suggest nearby locations
+- link real places to real tasks
+
+**Example:** Add "Pick up package" → Done suggests the nearest Posta
+Română.
+
+------------------------------------------------------------------------
+
+# 🧠 **Architecture**
+
+  -----------------------------------------------------------------------
+  Layer                                     Technology
+  ----------------------------------------- -----------------------------
+  **Frontend**                              React + Vite
+
+  **Mobile App**                            React Native + Expo (APK
+                                            required for notification
+                                            access)
+
+  **Backend**                               Node.js + Express
+
+  **AI System**                             Azure AI Foundry (GPT‑4o) +
+                                            custom MCP server
+
+  **Database**                              Azure SQL Database
+
+
+
+# 🛠️ **Quick Start**
+
+## ▶️ Backend
+
+``` bash
 cd backend
 npm install
 npm run dev
 ```
 
-The backend will start on `http://localhost:3000`
+## 📱 Mobile (APK Build)
 
-### 2. Run the Mobile App
-
-**Option A: Android Emulator**
-```bash
-cd mobile
-npm install
-npx expo start
-# Press 'a' for Android emulator
-```
-
-**Option B: Build APK for Physical Device** (Required for notification access)
-```bash
+``` bash
 cd mobile
 npm install
 npm run build:android
 ```
 
-See `mobile/BUILD_GUIDE.md` for detailed APK build instructions.
+Install APK → enable notification access.
 
-### 3. Run the Web Frontend
+## 💻 Frontend
 
-```bash
-# Windows
-run_app.bat
-
-# Or manually
+``` bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Notification Format
+------------------------------------------------------------------------
 
-The mobile app sends notifications to the backend in the following format:
+# 🔄 **Notification Payload Example**
 
-```json
+``` json
 {
   "source_app": "WhatsApp",
   "title": "John Doe",
@@ -72,54 +153,40 @@ The mobile app sends notifications to the backend in the following format:
 }
 ```
 
-The backend processes these and decides whether to create a task.
+------------------------------------------------------------------------
 
-## Project Structure
+# 📂 **Project Structure**
 
-```
-NoAIUsed/
-├── frontend/          # React web app (UI simulator)
-├── mobile/            # React Native mobile app
-├── backend/           # Node.js backend server
-│   ├── src/
-│   │   ├── index.ts        # Main server
-│   │   └── routes/
-│   │       ├── ingest.ts   # Notification processing
-│   │       └── tasks.ts    # Task management
-│   ├── QUICKSTART.md       # Backend setup guide
-│   └── package.json
-├── start_backend.bat  # Quick backend starter
-└── run_app.bat        # Quick frontend starter
-```
+    Done/
+    ├── backend/
+    │   ├── src/
+    │   │   ├── index.ts
+    │   │   └── routes/
+    │   │       ├── ingest.ts
+    │   │       └── tasks.ts
+    │   └── QUICKSTART.md
+    ├── mobile/
+    │   ├── src/
+    │   ├── app/
+    │   └── build/
+    └── frontend/
+        ├── src/
+        └── vite.config.js
 
-## Documentation
+------------------------------------------------------------------------
 
-- **Backend Setup:** `backend/QUICKSTART.md`
-- **APK Building:** `mobile/BUILD_GUIDE.md`
-- **Architecture:** `backend/ARCHITECTURE.md`
-- **MCP Server:** `backend/README.md`
+# 🧪 **Testing**
 
-## Current Status
+1.  Start backend
+2.  Install the APK
+3.  Allow notification access
+4.  Trigger a real notification
+5.  Watch backend logs
+6.  Open the app to see the generated task
 
-✅ **Completed:**
-- Mobile notification capture service
-- Local backend with notification ingestion
-- Basic task detection logic
-- APK build configuration
+------------------------------------------------------------------------
 
-🔨 **In Progress:**
-- Azure AI Foundry integration
-- MCP server implementation
-- Azure SQL Database connection
+# 🔮 **Future Improvements**
 
-## Testing
-
-1. Start the backend: `start_backend.bat`
-2. Build and install the mobile APK
-3. Grant notification permissions
-4. Send yourself a test message (WhatsApp, SMS, etc.)
-5. Check backend logs to see if the notification was processed
-
-## Contributing
-
-This is a personal project. Feel free to fork and adapt for your needs.
+-   smart schedule planning
+-   cross-device sync
