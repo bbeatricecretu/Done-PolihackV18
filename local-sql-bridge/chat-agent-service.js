@@ -368,14 +368,14 @@ REMEMBER:
           type: "function",
           function: {
             name: "update_task_status",
-            description: "Update status of multiple tasks",
+            description: "Update status of multiple tasks by searching for them. Use keywords to find tasks and change their status between pending and completed.",
             parameters: {
               type: "object",
               properties: {
-                task_ids: { type: "array", items: { type: "string" } },
-                new_status: { type: "string", enum: ["pending", "completed"] }
+                search_query: { type: "string", description: "Keywords to search for tasks (from title or description)" },
+                new_status: { type: "string", enum: ["pending", "completed"], description: "New status to set for matching tasks" }
               },
-              required: ["task_ids", "new_status"]
+              required: ["search_query", "new_status"]
             }
           }
         }

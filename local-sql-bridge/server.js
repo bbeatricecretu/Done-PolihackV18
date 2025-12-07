@@ -256,13 +256,41 @@ async function executeMCPTool(toolName, args) {
       return { deleted_count: 0, message: 'No tasks to delete' };
       
     case 'update_task_status':
-      if (args.task_ids && args.task_ids.length > 0) {
-        const ids = args.task_ids.map(id => `'${id}'`).join(',');
+      if (args.search_query) {
+        // Search for tasks matching the query
+        const searchResult = await pool.request()
+          .query(`SELECT id, title FROM Tasks 
+                  WHERE is_deleted = 0
+                  AND (title LIKE '%${args.search_query}%' OR description LIKE '%${args.search_query}%')`);
+        
+        if (searchResult.recordset.length === 0) {
+          throw new Error(`No tasks found matching "${args.search_query}"`);
+        }
+        
+        const taskIds = searchResult.recordset.map(t => t.id);
         const newStatus = args.new_status === 'completed' ? 'completed' : 'pending';
-        await pool.request().query(`UPDATE Tasks SET status = '${newStatus}', updated_at = GETDATE() WHERE id IN (${ids})`);
-        return { updated_count: args.task_ids.length, message: 'Tasks status updated' };
+        
+        // Update status for all found tasks
+        const updateRequest = pool.request();
+        for (let i = 0; i < taskIds.length; i++) {
+          updateRequest.input(`id${i}`, sql.UniqueIdentifier, taskIds[i]);
+        }
+        
+        const idParams = taskIds.map((_, i) => `@id${i}`).join(',');
+        let updateQuery = `UPDATE Tasks SET status = '${newStatus}', updated_at = GETDATE()`;
+        
+        // If changing to pending, clear completed_at
+        if (newStatus === 'pending') {
+          updateQuery += ', completed_at = NULL';
+        }
+        
+        updateQuery += ` WHERE id IN (${idParams})`;
+        await updateRequest.query(updateQuery);
+        
+        console.log(`[update_task_status] Updated ${taskIds.length} task(s) to ${newStatus}`);
+        return { updated_count: taskIds.length, message: `${taskIds.length} task(s) status updated to ${newStatus}` };
       }
-      return { updated_count: 0, message: 'No tasks to update' };
+      return { updated_count: 0, message: 'No search_query provided' };
       
     case 'get_tasks_by_date':
       let dateQuery = 'SELECT * FROM Tasks WHERE is_deleted = 0';

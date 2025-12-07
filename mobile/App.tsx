@@ -290,7 +290,10 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
           </View>
 
           {/* ChatBoxPage - Always mounted, shown/hidden based on currentPage */}
-          <View style={[styles.chatContainer, currentPage === 'chat' ? styles.chatVisible : styles.chatHidden]}>
+          <View
+            style={[styles.chatContainer, currentPage === 'chat' ? styles.chatVisible : styles.chatHidden]}
+            pointerEvents={currentPage === 'chat' ? 'auto' : 'none'}
+          >
             <ChatBoxPage onTasksUpdate={() => {
               // Reload tasks when chat creates/modifies them
               syncWithServer();
