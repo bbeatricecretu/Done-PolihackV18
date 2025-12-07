@@ -5,13 +5,15 @@ const cors = require('cors');
 const { CosmosClient } = require('@azure/cosmos');
 const crypto = require('crypto');
 const AIAgentService = require('./ai-agent-service');
+const ChatAgentService = require('./chat-agent-service');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Initialize AI Agent Service
+// Initialize AI Agent Services
 const aiAgent = new AIAgentService();
+const chatAgent = new ChatAgentService();
 
 const PORT = 3000;
 
@@ -747,6 +749,224 @@ app.get('/api/proximity-notifications', async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting proximity notifications:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Chat endpoints
+// Process chat message with AI agent
+app.post('/api/chat/message', async (req, res) => {
+  console.log('\n========== CHAT MESSAGE RECEIVED ==========');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
+  const { chat_id, message } = req.body;
+  
+  if (!chat_id || !message) {
+    console.log('ERROR: Missing chat_id or message');
+    return res.status(400).json({ success: false, error: 'Missing chat_id or message' });
+  }
+  
+  if (!cosmosClient) {
+    console.error('CosmosDB not configured');
+    return res.status(503).json({ success: false, error: 'CosmosDB not configured' });
+  }
+  
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const chatContainer = database.container('chat');
+    
+    // 1. Store user message DIRECTLY in Cosmos DB (no AI involved)
+    const userMessageDoc = {
+      id: crypto.randomUUID(),
+      chat: chat_id,
+      message: message,
+      role: 'user',
+      timestamp: new Date().toISOString(),
+      metadata: {}
+    };
+    
+    await chatContainer.items.create(userMessageDoc);
+    console.log('[Chat] ✅ Stored user message directly in Cosmos DB');
+    
+    // 2. Get recent conversation history DIRECTLY from Cosmos DB
+    const historyQuery = {
+      query: `SELECT c.message, c.role, c.timestamp 
+              FROM c 
+              WHERE c.chat = @chat_id AND c.type != 'session'
+              ORDER BY c.timestamp DESC 
+              OFFSET 0 LIMIT 10`,
+      parameters: [{ name: "@chat_id", value: chat_id }]
+    };
+    
+    const { resources: historyResources } = await chatContainer.items.query(historyQuery).fetchAll();
+    const conversationHistory = historyResources.reverse(); // Chronological order
+    
+    console.log(`[Chat] Retrieved ${conversationHistory.length} previous messages from Cosmos DB`);
+    
+    // 3. Process with AI agent (AI only generates response, doesn't store anything)
+    const agentResult = await chatAgent.processChatMessage(chat_id, message, conversationHistory);
+    
+    if (!agentResult.success) {
+      throw new Error(agentResult.error || 'Agent processing failed');
+    }
+    
+    const assistantMessage = agentResult.message;
+    console.log('[Chat] Agent response:', assistantMessage);
+    
+    // 4. Store assistant message DIRECTLY in Cosmos DB (no AI involved)
+    const assistantMessageDoc = {
+      id: crypto.randomUUID(),
+      chat: chat_id,
+      message: assistantMessage,
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      metadata: {
+        tool_calls: agentResult.tool_calls?.length || 0,
+        finish_reason: agentResult.finish_reason
+      }
+    };
+    
+    await chatContainer.items.create(assistantMessageDoc);
+    console.log('[Chat] ✅ Stored assistant message directly in Cosmos DB');
+    
+    // 5. Execute tool calls if any (MCP tools will handle their own data operations)
+    if (agentResult.tool_calls && agentResult.tool_calls.length > 0) {
+      console.log(`[Chat] AI suggested ${agentResult.tool_calls.length} tool calls (for reference only)`);
+      agentResult.tool_calls.forEach(call => {
+        console.log(`  - ${call.function.name}: ${call.function.arguments}`);
+      });
+    }
+    
+    console.log('============================================\n');
+    
+    res.json({
+      success: true,
+      chat_id: chat_id,
+      user_message_id: userMessageDoc.id,
+      assistant_message_id: assistantMessageDoc.id,
+      response: assistantMessage,
+      tool_calls: agentResult.tool_calls || []
+    });
+    
+  } catch (error) {
+    console.error('[Chat] Error processing message:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get chat history
+app.get('/api/chat/:chat_id/history', async (req, res) => {
+  const { chat_id } = req.params;
+  const limit = parseInt(req.query.limit) || 50;
+  
+  if (!cosmosClient) {
+    return res.status(503).json({ error: 'CosmosDB not configured' });
+  }
+  
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const chatContainer = database.container('chat');
+    
+    const query = {
+      query: `SELECT * FROM c 
+              WHERE c.chat = @chat_id AND c.type != 'session'
+              ORDER BY c.timestamp ASC 
+              OFFSET 0 LIMIT @limit`,
+      parameters: [
+        { name: "@chat_id", value: chat_id },
+        { name: "@limit", value: limit }
+      ]
+    };
+    
+    const { resources } = await chatContainer.items.query(query).fetchAll();
+    
+    res.json({
+      success: true,
+      chat_id: chat_id,
+      message_count: resources.length,
+      messages: resources
+    });
+    
+  } catch (error) {
+    console.error('[Chat] Error fetching history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new chat session
+app.post('/api/chat/session', async (req, res) => {
+  const { user_id, session_name } = req.body;
+  
+  if (!cosmosClient) {
+    return res.status(503).json({ error: 'CosmosDB not configured' });
+  }
+  
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const chatContainer = database.container('chat');
+    
+    const sessionId = crypto.randomUUID();
+    const session = {
+      id: `session-${sessionId}`,
+      chat: sessionId,
+      type: 'session',
+      user_id: user_id || 'default',
+      session_name: session_name || `Chat - ${new Date().toLocaleDateString()}`,
+      created_at: new Date().toISOString(),
+      last_message_at: new Date().toISOString(),
+      message_count: 0,
+      metadata: {}
+    };
+    
+    await chatContainer.items.create(session);
+    
+    res.json({
+      success: true,
+      chat_id: sessionId,
+      session: session
+    });
+    
+  } catch (error) {
+    console.error('[Chat] Error creating session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get recent chat sessions
+app.get('/api/chat/sessions', async (req, res) => {
+  const limit = parseInt(req.query.limit) || 10;
+  const user_id = req.query.user_id;
+  
+  if (!cosmosClient) {
+    return res.status(503).json({ error: 'CosmosDB not configured' });
+  }
+  
+  try {
+    const database = cosmosClient.database(process.env.COSMOS_DATABASE);
+    const chatContainer = database.container('chat');
+    
+    let queryStr = `SELECT * FROM c WHERE c.type = 'session'`;
+    const parameters = [];
+    
+    if (user_id) {
+      queryStr += ` AND c.user_id = @user_id`;
+      parameters.push({ name: "@user_id", value: user_id });
+    }
+    
+    queryStr += ` ORDER BY c.last_message_at DESC OFFSET 0 LIMIT @limit`;
+    parameters.push({ name: "@limit", value: limit });
+    
+    const query = { query: queryStr, parameters: parameters };
+    const { resources } = await chatContainer.items.query(query).fetchAll();
+    
+    res.json({
+      success: true,
+      count: resources.length,
+      sessions: resources
+    });
+    
+  } catch (error) {
+    console.error('[Chat] Error fetching sessions:', error);
     res.status(500).json({ error: error.message });
   }
 });
