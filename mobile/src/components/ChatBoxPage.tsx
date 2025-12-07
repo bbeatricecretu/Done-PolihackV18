@@ -258,7 +258,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
 
   return (
     <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -274,6 +274,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
+        style={{ flex: 1 }}
         data={messages}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}

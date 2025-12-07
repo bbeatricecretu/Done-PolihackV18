@@ -1,7 +1,7 @@
 Write-Host "Cleaning and Building Memento APK..." -ForegroundColor Cyan
 
 # Set JAVA_HOME to Microsoft OpenJDK 17 to avoid version mismatch (Java 25 causes "major version 69" error)
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot"
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.9.8-hotspot"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 Write-Host "Set JAVA_HOME to: $env:JAVA_HOME" -ForegroundColor Gray
 
