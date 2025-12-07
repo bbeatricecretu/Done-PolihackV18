@@ -10,8 +10,8 @@ interface NavbarProps {
 
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const navItems = [
-    { id: 'chat' as const, icon: MessageCircle, label: 'Chat' },
     { id: 'home' as const, icon: Home, label: 'Home' },
+    { id: 'chat' as const, icon: MessageCircle, label: 'Chat' },
     { id: 'tasks' as const, icon: CheckSquare, label: 'Tasks' },
     { id: 'locations' as const, icon: MapPin, label: 'Locations' },
   ];
@@ -31,7 +31,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
             >
               {isActive ? (
                 <LinearGradient
-                  colors={['#fda4af', '#f9a8d4', '#c4b5fd']} // rose-300, pink-300, violet-300
+                  colors={['#d8b4fe', '#c084fc', '#a855f7']} // purple-300, purple-400, purple-500
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.activeBackground}

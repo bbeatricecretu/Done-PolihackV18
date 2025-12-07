@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { Send } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BlobBackground from './BlobBackground';
 
 interface Message {
   id: number;
@@ -32,31 +33,56 @@ export function ChatBoxPage() {
     }
   };
 
-  const renderItem = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageContainer,
-        item.sender === 'user' ? styles.userMessageContainer : styles.assistantMessageContainer,
-      ]}
-    >
-      {item.sender === 'user' ? (
-        <LinearGradient
-          colors={['#60a5fa', '#c084fc', '#e879f9']} // blue-400, purple-400, pink-400
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.bubble, styles.userBubble]}
-        >
-          <Text style={styles.userMessageText}>{item.text}</Text>
-          <Text style={styles.userTimeText}>{item.time}</Text>
-        </LinearGradient>
-      ) : (
-        <View style={[styles.bubble, styles.assistantBubble]}>
-          <Text style={styles.assistantMessageText}>{item.text}</Text>
-          <Text style={styles.assistantTimeText}>{item.time}</Text>
-        </View>
-      )}
-    </View>
-  );
+  const renderItem = ({ item, index }: { item: Message; index: number }) => {
+    const isLastFromSender = index === messages.length - 1 || messages[index + 1].sender !== item.sender;
+    const showAvatar = item.sender === 'assistant' && isLastFromSender;
+    const marginBottom = isLastFromSender ? 16 : 4;
+
+    return (
+      <View
+        style={[
+          styles.messageContainer,
+          item.sender === 'user' ? styles.userMessageContainer : styles.assistantMessageContainer,
+          { marginBottom }
+        ]}
+      >
+        {item.sender === 'assistant' && (
+          <View style={[
+            styles.avatarContainer, 
+            !showAvatar && { backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0 }
+          ]}>
+            {showAvatar && (
+              <LinearGradient
+                colors={['#c084fc', '#60a5fa']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarGradient}
+              >
+                <View style={styles.avatarBar} />
+                <View style={styles.avatarBar} />
+              </LinearGradient>
+            )}
+          </View>
+        )}
+        {item.sender === 'user' ? (
+          <LinearGradient
+            colors={['#8ED7FF', '#B58DFF']} // Blue to Lilac gradient (matching homepage/avatar)
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.bubble, styles.userBubble]}
+          >
+            <Text style={styles.userMessageText}>{item.text}</Text>
+            <Text style={styles.userTimeText}>{item.time}</Text>
+          </LinearGradient>
+        ) : (
+          <View style={[styles.bubble, styles.assistantBubble]}>
+            <Text style={styles.assistantMessageText}>{item.text}</Text>
+            <Text style={styles.assistantTimeText}>{item.time}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView 
@@ -65,17 +91,11 @@ export function ChatBoxPage() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Animated mesh gradient background simulation */}
-      <View style={styles.backgroundContainer}>
-        <View style={[styles.orb, styles.orb1]} />
-        <View style={[styles.orb, styles.orb2]} />
-        <View style={[styles.orb, styles.orb3]} />
-        <View style={[styles.orb, styles.orb4]} />
-      </View>
+      <BlobBackground opacity={0.4} flipColors={true} />
 
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>ChatBox</Text>
-        <Text style={styles.headerSubtitle}>Ask anything</Text>
       </View>
 
       {/* Messages */}
@@ -116,15 +136,15 @@ export function ChatBoxPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
   },
   header: {
     padding: 24,
-    borderBottomWidth: 1,
+    borderBottomWidth: 3,
     borderBottomColor: '#f3f4f6',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1f2937',
   },
@@ -133,18 +153,50 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   messagesList: {
-    padding: 24,
+    paddingHorizontal: 12,
+    paddingTop: 24,
     paddingBottom: 100,
   },
   messageContainer: {
     marginBottom: 16,
     flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   userMessageContainer: {
     justifyContent: 'flex-end',
   },
   assistantMessageContainer: {
     justifyContent: 'flex-start',
+  },
+  avatarContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarGradient: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+  },
+  avatarBar: {
+    width: 3,
+    height: 8,
+    backgroundColor: 'white',
+    borderRadius: 1.5,
+    marginBottom: 6,
   },
   bubble: {
     maxWidth: '75%',
@@ -155,16 +207,16 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f9fafb', // very light gray (gray-50)
     borderBottomLeftRadius: 4,
   },
   userMessageText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
   },
   assistantMessageText: {
     color: '#1f2937',
-    fontSize: 14,
+    fontSize: 16,
   },
   userTimeText: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -179,14 +231,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    backgroundColor: 'white',
+    borderTopWidth: 0,
+    backgroundColor: 'transparent', // transparent to show gradient
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)', // semi-transparent white for input
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -203,44 +254,5 @@ const styles = StyleSheet.create({
   sendButtonGradient: {
     padding: 8,
     borderRadius: 999,
-  },
-  backgroundContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-    zIndex: -1,
-  },
-  orb: {
-    position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.5,
-  },
-  orb1: {
-    top: -50,
-    left: -50,
-    width: 300,
-    height: 300,
-    backgroundColor: '#e0f2fe', // sky-100
-  },
-  orb2: {
-    top: 100,
-    right: -50,
-    width: 300,
-    height: 300,
-    backgroundColor: '#ccfbf1', // teal-100
-  },
-  orb3: {
-    bottom: 0,
-    left: 50,
-    width: 300,
-    height: 300,
-    backgroundColor: '#ffe4e6', // rose-100
-  },
-  orb4: {
-    top: '40%',
-    left: '30%',
-    width: 250,
-    height: 250,
-    backgroundColor: '#f3e8ff', // purple-100
-    opacity: 0.4,
   },
 });

@@ -135,6 +135,11 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
                   <Text style={[styles.tagText, styles.tagTextGreen]}>from {item.source}</Text>
                 </View>
               )}
+              {item.location && (
+                <View style={[styles.tag, styles.tagPurple]}>
+                  <Text style={[styles.tagText, styles.tagTextPurple]}>@{item.location}</Text>
+                </View>
+              )}
             </View>
             {item.dueDate && (
               <Text style={styles.dueText}>{item.dueDate}</Text>
@@ -190,15 +195,15 @@ export function TasksPage({ tasks, savedLocations, onToggleTask, onAddTask, onDe
           >
             <ListFilter size={20} color="#4b5563" />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsModalVisible(true)}
           >
             <LinearGradient
-              colors={['#fda4af', '#f9a8d4', '#c4b5fd']}
+              colors={['#d8b4fe', '#c084fc', '#a855f7']}
               style={styles.addButtonGradient}
             >
-              <Plus size={20} color="white" />
+              <Plus size={24} color="white" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -278,7 +283,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1f2937',
   },
@@ -304,12 +309,12 @@ const styles = StyleSheet.create({
   addButton: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   addButtonGradient: {
-    padding: 10,
+    padding: 8,
     borderRadius: 12,
   },
   searchContainer: {
@@ -408,6 +413,12 @@ const styles = StyleSheet.create({
   },
   tagTextGreen: {
     color: '#15803d', // green-700
+  },
+  tagPurple: {
+    backgroundColor: '#f3e8ff', // purple-100
+  },
+  tagTextPurple: {
+    color: '#7e22ce', // purple-700
   },
   dueText: {
     fontSize: 14,

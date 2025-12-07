@@ -4,6 +4,7 @@ import { Plus, Settings } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Task } from '../types';
 import { EditTaskModal } from './EditTaskModal';
+import BlobBackground from './BlobBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -41,12 +42,7 @@ export function HomePage({ onNavigate, tasks = [], onToggleTask, onDeleteTask, o
   return (
     <View style={styles.container}>
       {/* Animated mesh gradient background simulation */}
-      <View style={styles.backgroundContainer}>
-        <View style={[styles.orb, styles.orb1]} />
-        <View style={[styles.orb, styles.orb2]} />
-        <View style={[styles.orb, styles.orb3]} />
-        <View style={[styles.orb, styles.orb4]} />
-      </View>
+      <BlobBackground />
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
@@ -60,7 +56,9 @@ export function HomePage({ onNavigate, tasks = [], onToggleTask, onDeleteTask, o
               <Settings size={24} color="#1f2937" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.dateDisplay}>6 Dec</Text>
+          <Text style={styles.dateDisplay}>
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long' })}, {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+          </Text>
         </View>
 
         {/* Tasks Section */}
@@ -93,6 +91,11 @@ export function HomePage({ onNavigate, tasks = [], onToggleTask, onDeleteTask, o
                     {focusTask.source && (
                       <View style={[styles.tag, styles.tagGreen]}>
                         <Text style={[styles.tagText, styles.tagTextGreen]}>from {focusTask.source}</Text>
+                      </View>
+                    )}
+                    {focusTask.location && (
+                      <View style={[styles.tag, styles.tagPurple]}>
+                        <Text style={[styles.tagText, styles.tagTextPurple]}>@{focusTask.location}</Text>
                       </View>
                     )}
                   </View>
@@ -156,36 +159,32 @@ const styles = StyleSheet.create({
   orb: {
     position: 'absolute',
     borderRadius: 999,
-    opacity: 0.5,
+    opacity: 0.8,
   },
   orb1: {
     top: -50,
     left: -50,
     width: 300,
     height: 300,
-    backgroundColor: '#e0f2fe', // sky-100
   },
   orb2: {
     top: 100,
     right: -50,
     width: 300,
     height: 300,
-    backgroundColor: '#ccfbf1', // teal-100
   },
   orb3: {
     bottom: 0,
     left: 50,
     width: 300,
     height: 300,
-    backgroundColor: '#ffe4e6', // rose-100
   },
   orb4: {
     top: '40%',
     left: '30%',
     width: 250,
     height: 250,
-    backgroundColor: '#f3e8ff', // purple-100
-    opacity: 0.4,
+    opacity: 0.6,
   },
   content: {
     padding: 24,
@@ -203,20 +202,28 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 48,
-    fontWeight: '300',
+    fontWeight: '700',
     color: '#1f2937',
-    fontFamily: 'System', // Trying to get a lighter, cleaner look
     marginBottom: 8,
   },
   dateDisplay: {
-    fontSize: 56,
+    fontSize: 24,
     fontWeight: '400',
     color: '#1f2937',
-    fontFamily: 'System',
   },
   settingsButton: {
-    padding: 8,
-    marginTop: 8,
+    width: 48,
+    height: 48,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginTop: -24,
   },
   sectionContainer: {
     marginBottom: 24,
@@ -296,6 +303,12 @@ const styles = StyleSheet.create({
   },
   tagTextGreen: {
     color: '#15803d', // green-700
+  },
+  tagPurple: {
+    backgroundColor: '#f3e8ff', // purple-100
+  },
+  tagTextPurple: {
+    color: '#7e22ce', // purple-700
   },
   dueText: {
     fontSize: 14,

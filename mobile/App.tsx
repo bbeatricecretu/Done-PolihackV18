@@ -18,6 +18,8 @@ import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
+import { useFonts, Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { PlayfairDisplay_400Regular, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
 
 // Register the Headless Task for background notification listening
 
@@ -232,6 +234,16 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
 
 // Wrap the app in an ErrorBoundary to catch any errors and prevent crashes
 export default function App() {
+  let [fontsLoaded] = useFonts({
+    Pacifico_400Regular,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <ErrorBoundary>
       <AppContent />

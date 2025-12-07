@@ -36,7 +36,7 @@ function SettingItem({ icon: Icon, title, subtitle, type, value, onValueChange, 
           <Switch
             value={value}
             onValueChange={onValueChange}
-            trackColor={{ false: '#e5e7eb', true: '#f472b6' }}
+            trackColor={{ false: '#e5e7eb', true: '#8ED7FF' }}
             thumbColor={'white'}
             ios_backgroundColor="#e5e7eb"
           />
@@ -277,14 +277,14 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    backgroundColor: '#a855f7',
+    backgroundColor: '#B58DFF',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
   },
   testButton: {
     flex: 1,
-    backgroundColor: '#f472b6',
+    backgroundColor: '#8ED7FF',
     borderRadius: 12,
     padding: 12,
     flexDirection: 'row',
