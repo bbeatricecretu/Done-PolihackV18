@@ -8,7 +8,7 @@ import { EditTaskModal } from './EditTaskModal';
 const { width } = Dimensions.get('window');
 
 interface HomePageProps {
-  onNavigate: (page: 'settings') => void;
+  onNavigate: (page: 'home' | 'chat' | 'tasks' | 'settings' | 'locations') => void;
   tasks?: Task[];
   onToggleTask?: (id: number) => void;
   onDeleteTask?: (id: number) => void;

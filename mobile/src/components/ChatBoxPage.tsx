@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Send } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
   const [chatId, setChatId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const flatListRef = useRef<FlatList<Message>>(null);
 
   useEffect(() => {
     initializeChat();
@@ -33,7 +34,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
   const initializeChat = async () => {
     try {
       // Check if we have an existing chat session
-      let existingChatId = await AsyncStorage.getItem(CHAT_ID_KEY);
+      let existingChatId: string | null = await AsyncStorage.getItem(CHAT_ID_KEY);
       
       if (!existingChatId) {
         // Create a new chat session
@@ -49,7 +50,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
         
         if (response.ok) {
           const data = await response.json();
-          existingChatId = data.chat_id;
+          existingChatId = data.chat_id as string;
           await AsyncStorage.setItem(CHAT_ID_KEY, existingChatId);
         } else {
           // Fallback: generate local ID
@@ -58,10 +59,12 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
         }
       }
       
-      setChatId(existingChatId);
+      // At this point existingChatId is guaranteed to be a string
+      const chatIdToUse: string = existingChatId;
+      setChatId(chatIdToUse);
       
       // Load chat history
-      await loadChatHistory(existingChatId);
+      await loadChatHistory(chatIdToUse);
       
       setInitializing(false);
     } catch (error) {
@@ -245,11 +248,22 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
 
       {/* Messages */}
       <FlatList
+        ref={flatListRef}
         data={messages}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }
+        }}
+        onLayout={() => {
+          if (messages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
       />
 
       {/* Loading indicator */}
