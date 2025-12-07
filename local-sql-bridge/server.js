@@ -66,6 +66,20 @@ async function connectToDb() {
 connectToDb();
 
 // Execute MCP Tool Function
+const CHATBOT_TOOLS = [
+  'create_task_from_chat',
+  'get_all_tasks',
+  'search_tasks',
+  'get_completed_tasks',
+  'edit_task',
+  'mark_task_complete',
+  'delete_task',
+  'bulk_delete_tasks',
+  'update_task_status',
+  'get_tasks_summary',
+  'get_tasks_by_date'
+];
+
 async function executeMCPTool(toolName, args) {
   console.log(`[MCP] Executing tool: ${toolName}`);
   
@@ -111,27 +125,81 @@ async function executeMCPTool(toolName, args) {
       return { tasks: searchResult.recordset, count: searchResult.recordset.length };
       
     case 'mark_task_complete':
+      // First, find the task by searching title/description
+      let completeTaskId = null;
+      if (args.search_query) {
+        const searchResult = await pool.request()
+          .query(`SELECT TOP 1 id, title FROM Tasks 
+                  WHERE is_deleted = 0 AND status = 'pending'
+                  AND (title LIKE '%${args.search_query}%' OR description LIKE '%${args.search_query}%')
+                  ORDER BY created_at DESC`);
+        if (searchResult.recordset.length > 0) {
+          completeTaskId = searchResult.recordset[0].id;
+          console.log(`[mark_task_complete] Found task: "${searchResult.recordset[0].title}" (ID: ${completeTaskId})`);
+        } else {
+          throw new Error(`No pending task found matching "${args.search_query}"`);
+        }
+      } else {
+        throw new Error('search_query is required to find the task to complete');
+      }
+      
       await pool.request()
-        .input('id', sql.UniqueIdentifier, args.id)
+        .input('id', sql.UniqueIdentifier, completeTaskId)
         .query("UPDATE Tasks SET status = 'completed', completed_at = GETDATE(), updated_at = GETDATE() WHERE id = @id");
-      return { id: args.id, message: 'Task marked as complete' };
+      return { id: completeTaskId, message: 'Task marked as complete' };
       
     case 'delete_task':
+      // First, find the task by searching title/description
+      let deleteTaskId = null;
+      if (args.search_query) {
+        const searchResult = await pool.request()
+          .query(`SELECT TOP 1 id, title FROM Tasks 
+                  WHERE is_deleted = 0
+                  AND (title LIKE '%${args.search_query}%' OR description LIKE '%${args.search_query}%')
+                  ORDER BY created_at DESC`);
+        if (searchResult.recordset.length > 0) {
+          deleteTaskId = searchResult.recordset[0].id;
+          console.log(`[delete_task] Found task: "${searchResult.recordset[0].title}" (ID: ${deleteTaskId})`);
+        } else {
+          throw new Error(`No task found matching "${args.search_query}"`);
+        }
+      } else {
+        throw new Error('search_query is required to find the task to delete');
+      }
+      
       await pool.request()
-        .input('id', sql.UniqueIdentifier, args.id)
+        .input('id', sql.UniqueIdentifier, deleteTaskId)
         .query('UPDATE Tasks SET is_deleted = 1, updated_at = GETDATE() WHERE id = @id');
-      return { id: args.id, message: 'Task deleted' };
+      return { id: deleteTaskId, message: 'Task deleted' };
       
     case 'edit_task':
+      // First, find the task by searching title/description
+      let editTaskId = null;
+      if (args.search_query) {
+        const searchResult = await pool.request()
+          .query(`SELECT TOP 1 id, title FROM Tasks 
+                  WHERE is_deleted = 0 
+                  AND (title LIKE '%${args.search_query}%' OR description LIKE '%${args.search_query}%')
+                  ORDER BY created_at DESC`);
+        if (searchResult.recordset.length > 0) {
+          editTaskId = searchResult.recordset[0].id;
+          console.log(`[edit_task] Found task: "${searchResult.recordset[0].title}" (ID: ${editTaskId})`);
+        } else {
+          throw new Error(`No task found matching "${args.search_query}"`);
+        }
+      } else {
+        throw new Error('search_query is required to find the task to edit');
+      }
+      
       const request = pool.request();
       let updateParts = ['updated_at = GETDATE()'];
       
-      if (args.title) {
-        request.input('title', sql.NVarChar(sql.MAX), args.title);
+      if (args.new_title) {
+        request.input('title', sql.NVarChar(sql.MAX), args.new_title);
         updateParts.push('title = @title');
       }
-      if (args.description) {
-        request.input('description', sql.NVarChar(sql.MAX), args.description);
+      if (args.new_description) {
+        request.input('description', sql.NVarChar(sql.MAX), args.new_description);
         updateParts.push('description = @description');
       }
       if (args.priority) {
@@ -146,10 +214,18 @@ async function executeMCPTool(toolName, args) {
         request.input('due_date', sql.DateTime2, new Date(args.due_date));
         updateParts.push('due_date = @due_date');
       }
+      if (args.status) {
+        request.input('status', sql.NVarChar(sql.MAX), args.status);
+        updateParts.push('status = @status');
+        // If changing to pending, clear completed_at
+        if (args.status === 'pending') {
+          updateParts.push('completed_at = NULL');
+        }
+      }
       
-      request.input('id', sql.UniqueIdentifier, args.id);
+      request.input('id', sql.UniqueIdentifier, editTaskId);
       await request.query(`UPDATE Tasks SET ${updateParts.join(', ')} WHERE id = @id`);
-      return { id: args.id, message: 'Task updated successfully' };
+      return { id: editTaskId, message: 'Task updated successfully' };
       
     case 'get_completed_tasks':
       let completedQuery = "SELECT * FROM Tasks WHERE is_deleted = 0 AND status = 'completed'";
@@ -947,24 +1023,8 @@ app.post('/api/chat/message', async (req, res) => {
       throw new Error(agentResult.error || 'Agent processing failed');
     }
     
-    const assistantMessage = agentResult.message;
-    console.log('[Chat] Agent response:', assistantMessage);
-    
-    // 4. Store assistant message DIRECTLY in Cosmos DB (no AI involved)
-    const assistantMessageDoc = {
-      id: crypto.randomUUID(),
-      chat: chat_id,
-      message: assistantMessage,
-      role: 'assistant',
-      timestamp: new Date().toISOString(),
-      metadata: {
-        tool_calls: agentResult.tool_calls?.length || 0,
-        finish_reason: agentResult.finish_reason
-      }
-    };
-    
-    await chatContainer.items.create(assistantMessageDoc);
-    console.log('[Chat] ✅ Stored assistant message directly in Cosmos DB');
+    let assistantMessage = agentResult.message;
+    console.log('[Chat] Agent initial response:', assistantMessage);
     
     // 5. Execute tool calls immediately and provide feedback
     let executionResults = [];
@@ -982,6 +1042,7 @@ app.post('/api/chat/message', async (req, res) => {
           const toolResult = await executeMCPTool(functionName, functionArgs);
           
           executionResults.push({
+            tool_call_id: toolCall.id,
             tool: functionName,
             args: functionArgs,
             success: true,
@@ -992,6 +1053,7 @@ app.post('/api/chat/message', async (req, res) => {
         } catch (error) {
           console.error(`[Chat] ❌ Error executing ${toolCall.function.name}:`, error.message);
           executionResults.push({
+            tool_call_id: toolCall.id,
             tool: toolCall.function.name,
             args: JSON.parse(toolCall.function.arguments),
             success: false,
@@ -999,7 +1061,46 @@ app.post('/api/chat/message', async (req, res) => {
           });
         }
       }
+
+      // Generate follow-up response based on tool results
+      // Only if we executed chatbot-specific tools
+      const chatbotToolExecutions = executionResults.filter(r => 
+        CHATBOT_TOOLS.includes(r.tool)
+      );
+
+      if (chatbotToolExecutions.length > 0) {
+        console.log('[Chat] Generating follow-up response based on tool results...');
+        const followUpResult = await chatAgent.generateFollowUpResponse(
+          chat_id,
+          message,
+          conversationHistory,
+          agentResult.tool_calls,
+          executionResults,
+          deviceTimezone
+        );
+
+        if (followUpResult.success && followUpResult.message) {
+          assistantMessage = followUpResult.message;
+          console.log('[Chat] Agent follow-up response:', assistantMessage);
+        }
+      }
     }
+    
+    // 4. Store assistant message DIRECTLY in Cosmos DB (no AI involved)
+    const assistantMessageDoc = {
+      id: crypto.randomUUID(),
+      chat: chat_id,
+      message: assistantMessage,
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      metadata: {
+        tool_calls: agentResult.tool_calls?.length || 0,
+        finish_reason: agentResult.finish_reason
+      }
+    };
+    
+    await chatContainer.items.create(assistantMessageDoc);
+    console.log('[Chat] ✅ Stored assistant message directly in Cosmos DB');
     
     console.log('============================================\n');
     

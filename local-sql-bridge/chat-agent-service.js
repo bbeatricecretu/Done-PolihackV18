@@ -275,16 +275,19 @@ REMEMBER:
           type: "function",
           function: {
             name: "edit_task",
-            description: "Edit an existing task",
+            description: "Edit an existing task by searching for it first. Use keywords from the task title or description to find it. Can also change status between pending and completed.",
             parameters: {
               type: "object",
               properties: {
-                id: { type: "string" },
-                title: { type: "string" },
-                description: { type: "string" },
-                priority: { type: "string" }
+                search_query: { type: "string", description: "Keywords to search for the task (from title or description)" },
+                new_title: { type: "string", description: "New title for the task" },
+                new_description: { type: "string", description: "New description for the task" },
+                priority: { type: "string", enum: ["low", "medium", "high"] },
+                category: { type: "string", enum: ["general", "meetings", "finance", "shopping", "communication", "health"] },
+                due_date: { type: "string", description: "Due date in YYYY-MM-DD format" },
+                status: { type: "string", enum: ["pending", "completed"], description: "Change task status (e.g., reopen a completed task by setting to 'pending')" }
               },
-              required: ["id"]
+              required: ["search_query"]
             }
           }
         },
@@ -292,13 +295,13 @@ REMEMBER:
           type: "function",
           function: {
             name: "mark_task_complete",
-            description: "Mark a task as completed",
+            description: "Mark a task as completed by searching for it first. Use keywords from the task title or description to find it.",
             parameters: {
               type: "object",
               properties: {
-                id: { type: "string" }
+                search_query: { type: "string", description: "Keywords to search for the task (from title or description)" }
               },
-              required: ["id"]
+              required: ["search_query"]
             }
           }
         },
@@ -306,13 +309,13 @@ REMEMBER:
           type: "function",
           function: {
             name: "delete_task",
-            description: "Delete a task",
+            description: "Delete a task by searching for it first. Use keywords from the task title or description to find it.",
             parameters: {
               type: "object",
               properties: {
-                id: { type: "string" }
+                search_query: { type: "string", description: "Keywords to search for the task (from title or description)" }
               },
-              required: ["id"]
+              required: ["search_query"]
             }
           }
         },
@@ -413,6 +416,96 @@ REMEMBER:
 
     } catch (error) {
       console.error('[Chat Agent] Error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Generate a follow-up response after tool execution
+   */
+  async generateFollowUpResponse(chatId, userMessage, conversationHistory, toolCalls, toolResults, deviceTimezone = 'UTC') {
+    if (!this.agentEndpoint || !this.agentApiKey) {
+      return { success: false, error: 'Azure AI Agent not configured' };
+    }
+
+    try {
+      // Build conversation context
+      const messages = [
+        {
+          role: 'system',
+          content: this.getSystemPrompt(deviceTimezone)
+        }
+      ];
+
+      // Add conversation history
+      conversationHistory.forEach(msg => {
+        messages.push({
+          role: msg.role,
+          content: msg.message
+        });
+      });
+
+      // Add current user message
+      messages.push({
+        role: 'user',
+        content: userMessage
+      });
+
+      // Add the assistant's tool call message
+      messages.push({
+        role: 'assistant',
+        content: null,
+        tool_calls: toolCalls
+      });
+
+      // Add tool results
+      toolResults.forEach(res => {
+        messages.push({
+          role: 'tool',
+          tool_call_id: res.tool_call_id,
+          content: JSON.stringify(res.result)
+        });
+      });
+
+      // Call Azure AI Foundry
+      const fetch = (await import('node-fetch')).default;
+      const response = await fetch(`${this.agentEndpoint}/openai/deployments/${this.agentDeploymentName}/chat/completions?api-version=2024-08-01-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': this.agentApiKey
+        },
+        body: JSON.stringify({
+          messages: messages,
+          // We don't pass tools here because we just want the final response, 
+          // unless we want to allow chained tool calls (which might be too complex for now)
+          // But usually it's good to keep tools available just in case.
+          // For now, let's NOT pass tools to force a text response.
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Chat Agent] Follow-up API Error:', response.status, errorText);
+        throw new Error(`Azure AI Agent API error: ${response.status}`);
+      }
+
+      const agentResponse = await response.json();
+      const message = agentResponse.choices?.[0]?.message;
+
+      return {
+        success: true,
+        message: message?.content || '',
+        finish_reason: agentResponse.choices?.[0]?.finish_reason
+      };
+
+    } catch (error) {
+      console.error('[Chat Agent] Follow-up Error:', error);
       return {
         success: false,
         error: error.message
