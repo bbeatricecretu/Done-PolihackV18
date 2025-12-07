@@ -1,4 +1,4 @@
-# Memento - Experiencing the world without overwhelming it.
+# Done - Experiencing the world without overwhelming it.
 
 > **Hackathon Project:** "Experiencing the world without overwhelming it."
 
