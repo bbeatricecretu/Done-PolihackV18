@@ -2,7 +2,7 @@
 
 > **Hackathon Project:** "Experiencing the world without overwhelming it."
 
-Memento is not just another to-do list. It is an **Anti-To-Do List**. 
+Done is not just another to-do list. It is an **Anti-To-Do List**. 
 
 Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Memento acts as a **Context-Aware Filter**, hiding 90% of your tasks to reduce cognitive load and only showing you what is actionable **right now** based on your location, weather, and energy levels.
 
@@ -11,14 +11,14 @@ Traditional productivity apps act as storage bins for anxiety, showing you every
 ## 🚀 Key Features
 
 ### 1. 🧠 Context-Aware Task Filtering
-Instead of a long list of unchecked boxes, Memento shows you tasks relevant to your current context.
+Instead of a long list of unchecked boxes, Dond shows you tasks relevant to your current context.
 - **Location:** "Buy Groceries" only appears when you are near a supermarket.
 - **Weather:** "Wash Car" is hidden if it's raining.
 - **Time:** "Call Mom" is suggested in the evening, not during work hours.
 
 ### 2. 📩 AI-Powered Notification Ingestion
-Zero-friction entry. Memento listens to your Android notifications and uses AI to convert them into actionable tasks.
-- *Example:* You receive a text: "Can you pay the electric bill?" -> Memento creates a task: **"Pay Electric Bill"** (High Priority).
+Zero-friction entry. Done listens to your Android notifications and uses AI to convert them into actionable tasks.
+- *Example:* You receive a text: "Can you pay the electric bill?" -> Done creates a task: **"Pay Electric Bill"** (High Priority).
 
 ### 3. 🤖 Intelligent Suggestions (MCP)
 Powered by a **Model Context Protocol (MCP)** server connected to Azure AI Foundry (GPT-4o).
