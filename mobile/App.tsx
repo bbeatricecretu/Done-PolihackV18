@@ -9,10 +9,7 @@ import { SettingsPage } from './src/components/SettingsPage';
 import { LocationsPage } from './src/components/LocationsPage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NotificationListener } from './src/services/NotificationListener';
-import { DevConsoleModal } from './src/components/DevConsoleModal';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { Terminal } from 'lucide-react-native';
-import { TouchableOpacity } from 'react-native';
 import { Task, SavedLocation } from './src/types';
 import { TaskManager } from './src/services/TaskManager';
 import { DevLogger } from './src/services/DevLogger';
@@ -32,7 +29,7 @@ import { syncLocation } from './src/services/CloudSync';
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
   const chatBoxRef = useRef(null);
-  const [isDevConsoleOpen, setIsDevConsoleOpen] = useState(false);
+  // Dev console hidden in production build
   const [tasks, setTasks] = useState([]);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
 
@@ -319,18 +316,7 @@ const addLocation = (location) => {
           {/* Bottom navbar */}
           <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
 
-          {/* Dev Console Button */}
-          <TouchableOpacity
-            style={styles.devButton}
-            onPress={() => setIsDevConsoleOpen(true)}
-          >
-            <Terminal size={24} color="#fff" />
-          </TouchableOpacity>
-
-          <DevConsoleModal
-            visible={isDevConsoleOpen}
-            onClose={() => setIsDevConsoleOpen(false)}
-          />
+          {/* Dev Console hidden for end users */}
         </SafeAreaView>
       </LinearGradient>
     </SafeAreaProvider>
@@ -380,25 +366,5 @@ const styles = StyleSheet.create({
   },
   chatHidden: {
     display: 'none',
-  },
-  devButton: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    backgroundColor: '#333',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    zIndex: 1000,
   },
 });

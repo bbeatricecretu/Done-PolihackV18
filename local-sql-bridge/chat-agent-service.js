@@ -187,10 +187,14 @@ REMEMBER:
         }
       ];
 
-      // Add conversation history
+      // Add conversation history (skip or coerce entries without role)
       conversationHistory.forEach(msg => {
+        const role = msg.role || (msg.metadata?.role) || null;
+        if (!role) {
+          return; // drop malformed history entries to avoid API errors
+        }
         messages.push({
-          role: msg.role,
+          role,
           content: msg.message
         });
       });
@@ -440,10 +444,12 @@ REMEMBER:
         }
       ];
 
-      // Add conversation history
+      // Add conversation history (skip malformed entries)
       conversationHistory.forEach(msg => {
+        const role = msg.role || (msg.metadata?.role) || null;
+        if (!role) return;
         messages.push({
-          role: msg.role,
+          role,
           content: msg.message
         });
       });
