@@ -88,6 +88,21 @@ export async function syncLocation(latitude: number, longitude: number): Promise
   }
 }
 
+export async function fetchLocationsFromCloud(): Promise<any[]> {
+  try {
+    const apiBase = await getApiBase();
+    const response = await fetch(`${apiBase}/locations`);
+    if (response.ok) {
+      const locations = await response.json();
+      return locations;
+    }
+    return [];
+  } catch (error) {
+    console.error('[CloudSync] Error fetching locations:', error);
+    return [];
+  }
+}
+
 
 
 function generateUUID() {
@@ -95,6 +110,11 @@ function generateUUID() {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+export async function getIdMap(): Promise<Record<number, string>> {
+  const idMapStr = await AsyncStorage.getItem(ID_MAP_KEY);
+  return idMapStr ? JSON.parse(idMapStr) : {};
 }
 
 async function getCloudId(localId: number): Promise<string> {

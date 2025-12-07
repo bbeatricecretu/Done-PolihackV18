@@ -23,4 +23,5 @@ export interface SavedLocation {
   address?: string;
   latitude?: number;
   longitude?: number;
+  taskId?: number; // Optional link to a task (Local ID)
 }

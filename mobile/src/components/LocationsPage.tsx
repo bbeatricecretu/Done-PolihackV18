@@ -250,18 +250,17 @@ function MapPickerModal({ visible, initialRegion, onClose, onConfirm }: MapPicke
 }
 
 export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLocation }: LocationsPageProps) {
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['All']);
   const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [showUserLocation, setShowUserLocation] = useState(true);
 
-  useEffect(() => {
-    // Initialize with all locations selected
-    if (savedLocations.length > 0 && selectedLocationIds.length === 0) {
-        setSelectedLocationIds(savedLocations.map(l => l.id));
-    }
-  }, []);
+  // Initialize with NO locations selected (wait for task selection)
+  // useEffect(() => {
+  //   if (savedLocations.length > 0 && selectedLocationIds.length === 0) {
+  //       setSelectedLocationIds(savedLocations.map(l => l.id));
+  //   }
+  // }, []);
 
   const toggleLocationSelection = (id: string) => {
     setSelectedLocationIds(prev => 
@@ -277,11 +276,8 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
   const [isLocationsExpanded, setIsLocationsExpanded] = useState(false);
-  const [isTasksExpanded, setIsTasksExpanded] = useState(false);
-  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+  const [isTasksExpanded, setIsTasksExpanded] = useState(true); // Default expanded
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
-
-  const categories = ['All', 'Shopping', 'Personal', 'Social', 'Work'];
 
   useEffect(() => {
     (async () => {
@@ -297,32 +293,25 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
   }, []);
 
   const toggleTaskSelection = (taskId: number) => {
-    setSelectedTaskIds(prev => 
-      prev.includes(taskId) 
+    setSelectedTaskIds(prev => {
+      const newSelection = prev.includes(taskId) 
         ? prev.filter(id => id !== taskId)
-        : [...prev, taskId]
-    );
-  };
-
-  const toggleCategory = (category: string) => {
-    if (category === 'All') {
-      setSelectedCategories(['All']);
-    } else {
-      let newCategories = selectedCategories.filter(c => c !== 'All');
-      if (selectedCategories.includes(category)) {
-        newCategories = newCategories.filter(c => c !== category);
+        : [...prev, taskId];
+      
+      // If any task is selected, show ONLY locations linked to that task
+      if (newSelection.length > 0) {
+        const relevantLocationIds = savedLocations
+            .filter(l => l.taskId && newSelection.includes(l.taskId))
+            .map(l => l.id);
+        setSelectedLocationIds(relevantLocationIds);
       } else {
-        newCategories = [...newCategories, category];
+        // If no task selected, clear map (or show all? User implied show on click)
+        setSelectedLocationIds([]);
       }
-      if (newCategories.length === 0) newCategories = ['All'];
-      setSelectedCategories(newCategories);
-    }
+      
+      return newSelection;
+    });
   };
-
-  const filteredTasks = tasks.filter(task => {
-    if (selectedCategories.includes('All')) return true;
-    return task.category && selectedCategories.includes(task.category);
-  });
 
   const handleAddPress = () => {
     setPickerMode('add');
@@ -472,40 +461,6 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
           )}
         </View>
 
-        {/* Category Filter */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.filterHeader} 
-            onPress={() => setIsCategoriesExpanded(!isCategoriesExpanded)}
-          >
-            <Text style={styles.filterTitle}>Choose your category</Text>
-            {isCategoriesExpanded ? <ChevronUp size={20} color="#4b5563" /> : <ChevronDown size={20} color="#4b5563" />}
-          </TouchableOpacity>
-          
-          {isCategoriesExpanded ? (
-             <View style={{ marginTop: 12, gap: 8 }}>
-                {categories.map(category => (
-                  <TouchableOpacity 
-                    key={category} 
-                    style={styles.taskRow}
-                    onPress={() => toggleCategory(category)}
-                  >
-                    <View style={[styles.checkbox, selectedCategories.includes(category) && styles.checkboxChecked]}>
-                        {selectedCategories.includes(category) && <Check size={12} color="white" />}
-                    </View>
-                    <Text style={styles.taskTitle}>{category}</Text>
-                  </TouchableOpacity>
-                ))}
-             </View>
-          ) : (
-             <Text style={styles.selectionSummary} numberOfLines={1}>
-                {selectedCategories.join(', ')}
-             </Text>
-          )}
-        </View>
-
-
-
         {/* Filtered Tasks List */}
         <View style={styles.section}>
           <TouchableOpacity 
@@ -517,9 +472,9 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
           </TouchableOpacity>
 
           {isTasksExpanded && (
-            filteredTasks.length > 0 ? (
+            tasks.length > 0 ? (
               <View style={{ marginTop: 12, gap: 8 }}>
-                {filteredTasks.map(task => (
+                {tasks.map(task => (
                   <TouchableOpacity 
                     key={task.id} 
                     style={styles.taskRow}
@@ -533,7 +488,7 @@ export function LocationsPage({ tasks, savedLocations, onAddLocation, onUpdateLo
                 ))}
               </View>
             ) : (
-              <Text style={styles.emptyText}>No tasks found for selected categories.</Text>
+              <Text style={styles.emptyText}>No tasks found.</Text>
             )
           )}
         </View>

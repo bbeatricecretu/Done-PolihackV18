@@ -476,6 +476,24 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+// Get All Locations
+app.get('/api/locations', async (req, res) => {
+  console.log('[GET /api/locations] Fetching all locations...');
+  try {
+    const result = await sql.query`
+      SELECT tl.*, t.title as task_title 
+      FROM TaskLocations tl
+      JOIN Tasks t ON tl.task_id = t.id
+      WHERE t.is_deleted = 0
+    `;
+    console.log(`[GET /api/locations] Returning ${result.recordset.length} locations`);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Get locations error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Create Task
 app.post('/api/tasks', async (req, res) => {
   const task = req.body;
