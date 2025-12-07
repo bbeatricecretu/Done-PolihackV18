@@ -33,13 +33,21 @@ class AIAgentService {
       const database = this.cosmosClient.database(process.env.COSMOS_DATABASE);
       const container = database.container(process.env.COSMOS_CONTAINER);
 
+      // Exclude notifications from our own app (com.memento.app) and other system apps
       const query = {
-        query: "SELECT * FROM c WHERE c.processed = false AND (NOT IS_DEFINED(c.seen_by_agent) OR c.seen_by_agent = false) ORDER BY c.timestamp DESC OFFSET 0 LIMIT @limit",
+        query: `SELECT * FROM c 
+                WHERE c.processed = false 
+                  AND (NOT IS_DEFINED(c.seen_by_agent) OR c.seen_by_agent = false)
+                  AND c.appName != 'com.memento.app'
+                  AND c.appName != 'android'
+                  AND c.appName != 'com.android.systemui'
+                ORDER BY c.timestamp DESC 
+                OFFSET 0 LIMIT @limit`,
         parameters: [{ name: "@limit", value: limit }]
       };
 
       const { resources } = await container.items.query(query).fetchAll();
-      console.log(`[AI Agent] Found ${resources.length} unprocessed notifications`);
+      console.log(`[AI Agent] Found ${resources.length} unprocessed notifications (excluding app's own notifications)`);
       return resources;
     } catch (error) {
       console.error('[AI Agent] Error fetching notifications:', error);

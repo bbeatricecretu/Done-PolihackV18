@@ -19,6 +19,7 @@ import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { LocationService } from './src/services/LocationService';
+import ProximityNotificationService from './src/services/ProximityNotificationService';
 
 import { syncLocation } from './src/services/CloudSync';
 
@@ -195,6 +196,40 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
     };
     
     initNotifications();
+  }, []);
+
+  // Initialize proximity notification service
+  useEffect(() => {
+    const initProximityNotifications = async () => {
+      try {
+        console.log('[App] Initializing proximity notifications...');
+        const success = await ProximityNotificationService.initialize();
+        
+        if (success) {
+          console.log('[App] Starting proximity notification polling...');
+          ProximityNotificationService.startPolling();
+          
+          // Handle notification taps (optional: navigate to task)
+          ProximityNotificationService.addNotificationResponseListener((response) => {
+            const taskId = response.notification.request.content.data?.task_id;
+            if (taskId) {
+              console.log('[App] User tapped proximity notification for task:', taskId);
+              // Navigate to tasks page
+              setCurrentPage('tasks');
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[App] Failed to initialize proximity notifications:', error);
+      }
+    };
+
+    initProximityNotifications();
+
+    // Cleanup on unmount
+    return () => {
+      ProximityNotificationService.stopPolling();
+    };
   }, []);
 
   const renderPage = () => {
