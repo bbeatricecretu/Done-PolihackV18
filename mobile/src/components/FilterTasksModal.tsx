@@ -235,7 +235,7 @@ export function FilterTasksModal({
 
                 <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
                   <LinearGradient
-                    colors={['#fda4af', '#f9a8d4', '#c4b5fd']}
+                    colors={['#B58DFF', '#8ED7FF']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.gradient}
