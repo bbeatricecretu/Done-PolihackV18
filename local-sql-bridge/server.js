@@ -75,26 +75,28 @@ async function executeMCPTool(toolName, args) {
     case 'create_task_from_chat':
       const taskId = crypto.randomUUID();
       await pool.request()
-        .input('id', sql.VarChar(50), taskId)
-        .input('title', sql.NVarChar(200), args.title)
+        .input('id', sql.UniqueIdentifier, taskId)
+        .input('title', sql.NVarChar(sql.MAX), args.title)
         .input('description', sql.NVarChar(sql.MAX), args.description || '')
-        .input('category', sql.VarChar(50), args.category || 'general')
-        .input('priority', sql.VarChar(20), args.priority || 'medium')
-        .input('due_date', sql.DateTime, args.due_date ? new Date(args.due_date) : null)
-        .input('location_dependent', sql.Bit, args.location_dependent || false)
-        .input('weather_dependent', sql.Bit, args.weather_dependent || false)
-        .input('time_dependent', sql.Bit, args.time_dependent || false)
-        .input('completed', sql.Bit, false)
-        .input('deleted', sql.Bit, false)
-        .query(`INSERT INTO Tasks (id, title, description, category, priority, due_date, location_dependent, weather_dependent, time_dependent, completed, deleted, created_at, updated_at)
-                VALUES (@id, @title, @description, @category, @priority, @due_date, @location_dependent, @weather_dependent, @time_dependent, @completed, @deleted, GETDATE(), GETDATE())`);
+        .input('category', sql.NVarChar(sql.MAX), args.category || 'general')
+        .input('priority', sql.NVarChar(sql.MAX), args.priority || 'medium')
+        .input('status', sql.NVarChar(sql.MAX), 'pending')
+        .input('due_date', sql.DateTime2, args.due_date ? new Date(args.due_date) : null)
+        .input('LocationDependent', sql.Bit, args.location_dependent || false)
+        .input('WeatherDependent', sql.Bit, args.weather_dependent || false)
+        .input('TimeDependent', sql.Bit, args.time_dependent || false)
+        .input('is_deleted', sql.Bit, false)
+        .input('source', sql.NVarChar(sql.MAX), 'chatbot')
+        .input('source_app', sql.NVarChar(sql.MAX), 'mobile_chat')
+        .query(`INSERT INTO Tasks (id, title, description, category, priority, status, due_date, LocationDependent, WeatherDependent, TimeDependent, is_deleted, source, source_app, created_at, updated_at)
+                VALUES (@id, @title, @description, @category, @priority, @status, @due_date, @LocationDependent, @WeatherDependent, @TimeDependent, @is_deleted, @source, @source_app, GETDATE(), GETDATE())`);
       return { id: taskId, title: args.title, message: 'Task created successfully' };
       
     case 'get_all_tasks':
       const status = args.status || 'all';
-      let query = 'SELECT * FROM Tasks WHERE deleted = 0';
-      if (status === 'pending') query += ' AND completed = 0';
-      if (status === 'completed') query += ' AND completed = 1';
+      let query = 'SELECT * FROM Tasks WHERE is_deleted = 0';
+      if (status === 'pending') query += " AND status = 'pending'";
+      if (status === 'completed') query += " AND status = 'completed'";
       if (args.category) query += ` AND category = '${args.category}'`;
       if (args.priority) query += ` AND priority = '${args.priority}'`;
       query += ' ORDER BY created_at DESC';
@@ -104,36 +106,53 @@ async function executeMCPTool(toolName, args) {
       return { tasks: allTasksResult.recordset, count: allTasksResult.recordset.length };
       
     case 'search_tasks':
-      const searchQuery = `SELECT * FROM Tasks WHERE deleted = 0 AND (title LIKE '%${args.query}%' OR description LIKE '%${args.query}%')`;
+      const searchQuery = `SELECT * FROM Tasks WHERE is_deleted = 0 AND (title LIKE '%${args.query}%' OR description LIKE '%${args.query}%')`;
       const searchResult = await pool.request().query(searchQuery);
       return { tasks: searchResult.recordset, count: searchResult.recordset.length };
       
     case 'mark_task_complete':
       await pool.request()
-        .input('id', sql.VarChar(50), args.id)
-        .query('UPDATE Tasks SET completed = 1, completed_at = GETDATE(), updated_at = GETDATE() WHERE id = @id');
+        .input('id', sql.UniqueIdentifier, args.id)
+        .query("UPDATE Tasks SET status = 'completed', completed_at = GETDATE(), updated_at = GETDATE() WHERE id = @id");
       return { id: args.id, message: 'Task marked as complete' };
       
     case 'delete_task':
       await pool.request()
-        .input('id', sql.VarChar(50), args.id)
-        .query('UPDATE Tasks SET deleted = 1, updated_at = GETDATE() WHERE id = @id');
+        .input('id', sql.UniqueIdentifier, args.id)
+        .query('UPDATE Tasks SET is_deleted = 1, updated_at = GETDATE() WHERE id = @id');
       return { id: args.id, message: 'Task deleted' };
       
     case 'edit_task':
-      let updateQuery = 'UPDATE Tasks SET updated_at = GETDATE()';
-      if (args.title) updateQuery += `, title = '${args.title}'`;
-      if (args.description) updateQuery += `, description = '${args.description}'`;
-      if (args.priority) updateQuery += `, priority = '${args.priority}'`;
-      if (args.category) updateQuery += `, category = '${args.category}'`;
-      if (args.due_date) updateQuery += `, due_date = '${args.due_date}'`;
-      updateQuery += ` WHERE id = '${args.id}'`;
+      const request = pool.request();
+      let updateParts = ['updated_at = GETDATE()'];
       
-      await pool.request().query(updateQuery);
+      if (args.title) {
+        request.input('title', sql.NVarChar(sql.MAX), args.title);
+        updateParts.push('title = @title');
+      }
+      if (args.description) {
+        request.input('description', sql.NVarChar(sql.MAX), args.description);
+        updateParts.push('description = @description');
+      }
+      if (args.priority) {
+        request.input('priority', sql.NVarChar(sql.MAX), args.priority);
+        updateParts.push('priority = @priority');
+      }
+      if (args.category) {
+        request.input('category', sql.NVarChar(sql.MAX), args.category);
+        updateParts.push('category = @category');
+      }
+      if (args.due_date) {
+        request.input('due_date', sql.DateTime2, new Date(args.due_date));
+        updateParts.push('due_date = @due_date');
+      }
+      
+      request.input('id', sql.UniqueIdentifier, args.id);
+      await request.query(`UPDATE Tasks SET ${updateParts.join(', ')} WHERE id = @id`);
       return { id: args.id, message: 'Task updated successfully' };
       
     case 'get_completed_tasks':
-      let completedQuery = 'SELECT * FROM Tasks WHERE deleted = 0 AND completed = 1';
+      let completedQuery = "SELECT * FROM Tasks WHERE is_deleted = 0 AND status = 'completed'";
       if (args.category) completedQuery += ` AND category = '${args.category}'`;
       completedQuery += ' ORDER BY completed_at DESC';
       if (args.limit) completedQuery += ` OFFSET 0 ROWS FETCH NEXT ${args.limit} ROWS ONLY`;
@@ -145,17 +164,17 @@ async function executeMCPTool(toolName, args) {
       const summaryResult = await pool.request().query(`
         SELECT 
           COUNT(*) as total,
-          SUM(CASE WHEN completed = 0 THEN 1 ELSE 0 END) as pending,
-          SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
           SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_priority
-        FROM Tasks WHERE deleted = 0
+        FROM Tasks WHERE is_deleted = 0
       `);
       return summaryResult.recordset[0];
       
     case 'bulk_delete_tasks':
       if (args.task_ids && args.task_ids.length > 0) {
         const ids = args.task_ids.map(id => `'${id}'`).join(',');
-        await pool.request().query(`UPDATE Tasks SET deleted = 1, updated_at = GETDATE() WHERE id IN (${ids})`);
+        await pool.request().query(`UPDATE Tasks SET is_deleted = 1, updated_at = GETDATE() WHERE id IN (${ids})`);
         return { deleted_count: args.task_ids.length, message: 'Tasks deleted successfully' };
       }
       return { deleted_count: 0, message: 'No tasks to delete' };
@@ -163,14 +182,14 @@ async function executeMCPTool(toolName, args) {
     case 'update_task_status':
       if (args.task_ids && args.task_ids.length > 0) {
         const ids = args.task_ids.map(id => `'${id}'`).join(',');
-        const newStatus = args.new_status === 'completed' ? 1 : 0;
-        await pool.request().query(`UPDATE Tasks SET completed = ${newStatus}, updated_at = GETDATE() WHERE id IN (${ids})`);
+        const newStatus = args.new_status === 'completed' ? 'completed' : 'pending';
+        await pool.request().query(`UPDATE Tasks SET status = '${newStatus}', updated_at = GETDATE() WHERE id IN (${ids})`);
         return { updated_count: args.task_ids.length, message: 'Tasks status updated' };
       }
       return { updated_count: 0, message: 'No tasks to update' };
       
     case 'get_tasks_by_date':
-      let dateQuery = 'SELECT * FROM Tasks WHERE deleted = 0';
+      let dateQuery = 'SELECT * FROM Tasks WHERE is_deleted = 0';
       const dateResult = await pool.request().query(dateQuery);
       return { tasks: dateResult.recordset, count: dateResult.recordset.length };
       
@@ -906,13 +925,16 @@ app.post('/api/chat/message', async (req, res) => {
     const historyQuery = {
       query: `SELECT c.message, c.role, c.timestamp 
               FROM c 
-              WHERE c.chat = @chat_id AND c.type != 'session'
+              WHERE c.chat = @chat_id
               ORDER BY c.timestamp DESC 
-              OFFSET 0 LIMIT 10`,
+              OFFSET 0 LIMIT 20`,
       parameters: [{ name: "@chat_id", value: chat_id }]
     };
     
-    const { resources: historyResources } = await chatContainer.items.query(historyQuery).fetchAll();
+    // Query with partition key for better performance
+    const { resources: historyResources } = await chatContainer.items
+      .query(historyQuery, { partitionKey: chat_id })
+      .fetchAll();
     const conversationHistory = historyResources.reverse(); // Chronological order
     
     console.log(`[Chat] Retrieved ${conversationHistory.length} previous messages from Cosmos DB`);
