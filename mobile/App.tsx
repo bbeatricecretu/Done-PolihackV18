@@ -19,6 +19,7 @@ import { DevLogger } from './src/services/DevLogger';
 import { syncTasksToCloud } from './src/services/CloudSync';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { LocationService } from './src/services/LocationService';
+import ProximityNotificationService from './src/services/ProximityNotificationService';
 
 import { syncLocation } from './src/services/CloudSync';
 
@@ -193,8 +194,26 @@ const addLocation = (location: Omit<SavedLocation, 'id'>) => {
         console.error('[App] Failed to initialize notification listener:', error);
       }
     };
+
+    const initProximity = async () => {
+      try {
+        console.log('[App] Initializing proximity notifications...');
+        const success = await ProximityNotificationService.initialize();
+        if (success) {
+          console.log('[App] Starting proximity polling...');
+          ProximityNotificationService.startPolling();
+        }
+      } catch (error) {
+        console.error('[App] Failed to initialize proximity notifications:', error);
+      }
+    };
     
     initNotifications();
+    initProximity();
+
+    return () => {
+      ProximityNotificationService.stopPolling();
+    };
   }, []);
 
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
