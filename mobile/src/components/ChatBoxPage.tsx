@@ -5,11 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 // --- MERGED IMPORTS START ---
 import BlobBackground from './BlobBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS, DEFAULT_CONFIG } from '../config/constants';
 // --- MERGED IMPORTS END ---
-
-const SERVER_IP_KEY = '@memento_server_ip';
-const DEFAULT_PORT = '3000';
-const CHAT_ID_KEY = '@memento_chat_id';
 
 interface Message {
   id: string;
@@ -37,7 +34,7 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
   const initializeChat = async () => {
     try {
       // Check if we have an existing chat session
-      let existingChatId: string | null = await AsyncStorage.getItem(CHAT_ID_KEY);
+      let existingChatId: string | null = await AsyncStorage.getItem(STORAGE_KEYS.CHAT_ID);
       
       if (!existingChatId) {
         // Create a new chat session
@@ -54,11 +51,11 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
         if (response.ok) {
           const data = await response.json();
           existingChatId = data.chat_id as string;
-          await AsyncStorage.setItem(CHAT_ID_KEY, existingChatId);
+          await AsyncStorage.setItem(STORAGE_KEYS.CHAT_ID, existingChatId);
         } else {
           // Fallback: generate local ID
           existingChatId = `chat-${Date.now()}`;
-          await AsyncStorage.setItem(CHAT_ID_KEY, existingChatId);
+          await AsyncStorage.setItem(STORAGE_KEYS.CHAT_ID, existingChatId);
         }
       }
       
@@ -75,18 +72,18 @@ export function ChatBoxPage({ onTasksUpdate }: ChatBoxPageProps) {
       // Fallback: use local ID
       const localChatId = `chat-${Date.now()}`;
       setChatId(localChatId);
-      await AsyncStorage.setItem(CHAT_ID_KEY, localChatId);
+      await AsyncStorage.setItem(STORAGE_KEYS.CHAT_ID, localChatId);
       setInitializing(false);
     }
   };
 
   const getBackendUrl = async (): Promise<string> => {
     try {
-      const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
-      const ip = storedIp || '192.168.1.128';
-      return `http://${ip}:${DEFAULT_PORT}`;
+      const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
+      const ip = storedIp || DEFAULT_CONFIG.FALLBACK_IP;
+      return `http://${ip}:${DEFAULT_CONFIG.PORT}`;
     } catch (e) {
-      return 'http://192.168.1.128:3000';
+      return `http://${DEFAULT_CONFIG.FALLBACK_IP}:${DEFAULT_CONFIG.PORT}`;
     }
   };
 

@@ -1,37 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Task, SavedLocation } from '../types';
-
-// Configuration Keys
-const SYNC_KEY = '@memento_last_sync';
-const ID_MAP_KEY = '@memento_id_map';
-const SERVER_IP_KEY = '@memento_server_ip';
-const DEFAULT_PORT = '3000';
+import { STORAGE_KEYS, DEFAULT_CONFIG } from '../config/constants';
 
 // Get the API base URL dynamically from stored settings
 async function getApiBase(): Promise<string> {
-  const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
-  const ip = storedIp || '192.168.1.1'; // Default fallback
-  return `http://${ip}:${DEFAULT_PORT}/api`;
+  const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
+  const ip = storedIp || DEFAULT_CONFIG.FALLBACK_IP;
+  return `http://${ip}:${DEFAULT_CONFIG.PORT}/api`;
 }
 
 // Export functions to get/set server IP from Settings
 export async function getServerIp(): Promise<string> {
-  const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+  const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
   return storedIp || '';
 }
 
 export async function setServerIp(ip: string): Promise<void> {
-  await AsyncStorage.setItem(SERVER_IP_KEY, ip);
+  await AsyncStorage.setItem(STORAGE_KEYS.SERVER_IP, ip);
 }
 
 export async function testServerConnection(): Promise<{ success: boolean; message: string }> {
   try {
-    const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+    const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
     if (!storedIp) {
       return { success: false, message: 'No server IP configured. Please enter an IP address.' };
     }
     
-    const url = `http://${storedIp}:${DEFAULT_PORT}/api/health`;
+    const url = `http://${storedIp}:${DEFAULT_CONFIG.PORT}/api/health`;
     console.log('[CloudSync] Testing connection to:', url);
     
     const controller = new AbortController();

@@ -1,9 +1,10 @@
 import * as Location from 'expo-location';
 import { DevLogger } from './DevLogger';
+import { GOOGLE_PLACES_API_KEY } from '../config/secrets';
 
 // TODO: Replace with your actual Google Maps API Key
 // Ideally, this should be in an environment variable (e.g., .env file with expo-constants)
-const GOOGLE_PLACES_API_KEY = 'AIzaSyDdFH1W6GHJ07UIL3WJ52mPFsGup9zCvYY'; 
+// Key is now loaded from secrets.ts (gitignored)
 
 export interface PlaceResult {
   name: string;

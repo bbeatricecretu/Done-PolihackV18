@@ -703,7 +703,7 @@ app.post('/api/sync-location', async (req, res) => {
 
   console.log(`Received location update: ${latitude}, ${longitude}`);
   // Note: Consider moving this to .env
-  const GOOGLE_API_KEY = 'AIzaSyDdFH1W6GHJ07UIL3WJ52mPFsGup9zCvYY';
+  const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
   try {
     // 1. Get active tasks

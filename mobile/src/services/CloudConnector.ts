@@ -9,10 +9,7 @@ import { TaskProcessor } from './TaskProcessor';
 import { TaskManager } from './TaskManager';
 import { DevLogger } from './DevLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const SERVER_IP_KEY = '@memento_server_ip';
-const DEFAULT_PORT = '3000';
-const DEFAULT_FALLBACK_IP = '192.168.1.1'; // Align with CloudSync default
+import { STORAGE_KEYS, DEFAULT_CONFIG } from '../config/constants';
 
 // Backend response format (kept for compatibility)
 interface ProcessNotificationResponse {
@@ -34,11 +31,11 @@ export class CloudConnector {
    */
   private static async getBackendUrl(): Promise<string> {
     try {
-      const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
-      const ip = storedIp || DEFAULT_FALLBACK_IP; // Default fallback
-      return `http://${ip}:${DEFAULT_PORT}`;
+      const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
+      const ip = storedIp || DEFAULT_CONFIG.FALLBACK_IP;
+      return `http://${ip}:${DEFAULT_CONFIG.PORT}`;
     } catch (e) {
-      return `http://${DEFAULT_FALLBACK_IP}:${DEFAULT_PORT}`;
+      return `http://${DEFAULT_CONFIG.FALLBACK_IP}:${DEFAULT_CONFIG.PORT}`;
     }
   }
 
@@ -116,7 +113,7 @@ export class CloudConnector {
    * Update backend URL - now uses AsyncStorage
    */
   static async setBackendUrl(url: string): Promise<void> {
-    await AsyncStorage.setItem(SERVER_IP_KEY, url);
+    await AsyncStorage.setItem(STORAGE_KEYS.SERVER_IP, url);
     DevLogger.log('[CloudConnector] Backend URL set to:', url);
   }
 
@@ -125,13 +122,13 @@ export class CloudConnector {
    */
   static async sendNotification(notification: { appName: string, title: string, content: string, timestamp: string }) {
     try {
-      const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+      const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
       if (!storedIp) {
         DevLogger.log('[CloudConnector] No server IP configured; cannot forward notification. Set it in Settings.', notification);
         return false;
       }
 
-      const backendUrl = `http://${storedIp}:${DEFAULT_PORT}`;
+      const backendUrl = `http://${storedIp}:${DEFAULT_CONFIG.PORT}`;
       DevLogger.log('[CloudConnector] Sending notification to bridge...', { url: backendUrl, title: notification.title, app: notification.appName });
 
       const response = await fetch(`${backendUrl}/api/notifications`, {

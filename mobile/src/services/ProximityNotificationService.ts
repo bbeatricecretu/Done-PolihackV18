@@ -1,9 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const SERVER_IP_KEY = '@memento_server_ip';
-const DEFAULT_PORT = '3000';
+import { STORAGE_KEYS, DEFAULT_CONFIG } from '../config/constants';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -94,12 +92,12 @@ class ProximityNotificationService {
 
   private async checkForProximityNotifications() {
     try {
-      const storedIp = await AsyncStorage.getItem(SERVER_IP_KEY);
+      const storedIp = await AsyncStorage.getItem(STORAGE_KEYS.SERVER_IP);
       if (!storedIp) {
         return;
       }
 
-      const apiBase = `http://${storedIp}:${DEFAULT_PORT}/api`;
+      const apiBase = `http://${storedIp}:${DEFAULT_CONFIG.PORT}/api`;
       const response = await fetch(`${apiBase}/proximity-notifications`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
