@@ -81,7 +81,8 @@ NoAIUsed/
 ```bash
 cd local-sql-bridge
 npm install
-# Create a .env file with DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME, COSMOS_ENDPOINT, COSMOS_KEY
+# Copy .env.example to .env
+# Edit .env with your Azure SQL & Cosmos DB credentials
 node server.js
 ```
 
@@ -90,15 +91,23 @@ node server.js
 cd mcp-server
 npm install
 npm run build
-# Create a .env file with Azure credentials
+# Copy .env.example to .env
+# Edit .env with your Azure credentials
 npm run start:http
 ```
 
-### 3. Run Mobile App
-**Option A: Development (Expo Go)**
+### 3. Setup & Run Mobile App
 ```bash
 cd mobile
 npm install
+
+# Setup Config (IMPORTANT)
+# Copy src/config/secrets.example.ts to src/config/secrets.ts
+# Edit src/config/secrets.ts to add your Google Places API Key
+```
+
+**Option A: Development (Expo Go)**
+```bash
 npx expo start
 ```
 
