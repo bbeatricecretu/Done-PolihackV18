@@ -1,11 +1,8 @@
-# Done - Experiencing the world without overwhelming it.
+# Done– Context Aware Task Manager
 
-> **Hackathon Project:** "Experiencing the world without overwhelming it."
+Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Memento acts as a **Context-Aware Filter**,  and only showing you what is actionable **right now** based on your location, weather, and energy levels.Done -- an app developed in 48 hours at Polihack v18 in a 5-member team — is a context-aware task manager that filters tasks and notifications to show only what’s actionable based on location, weather, and energy level, hiding 90% of your tasks to reduce cognitive load. We  won 1st place at AppDev category and we were qualified for the *Innovation Labs 2026* national stage.
 
-Done is not just another to-do list. It is an **Anti-To-Do List**. 
-
-Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Memento acts as a **Context-Aware Filter**, hiding 90% of your tasks to reduce cognitive load and only showing you what is actionable **right now** based on your location, weather, and energy levels.
-
+> **AppDev Theme:** "Experiencing the world without overwhelming it."
 ---
 
 ## 🚀 Key Features
@@ -121,16 +118,8 @@ cd mobile
 
 ---
 
-## 📱 Demo Flow (5 Minutes)
+## 📺 Demo
 
-1.  **The Hook:** Show the "Anti-To-Do List" interface. It's calm and empty.
-2.  **The Context Switch:** Walk to a specific location (or simulate it). Watch the app surface a relevant task (e.g., "Pick up package" when near the post office).
-3.  **The Magic:** Send a dummy notification to the phone. Show Memento automatically parsing it and creating a prioritized task without you typing a word.
+[**▶️ Watch the Demo Video on YouTube**](https://youtu.be/GKBEBxHppGU?feature=shared)
 
 ---
-
-## 🛡️ Privacy & Philosophy
-
-Memento is designed to help you experience the world, not just manage it. 
-- **Local First:** Location data is processed locally where possible.
-- **Curated Focus:** The AI acts as a filter, not a boss. You can always access your full list in the "Brain Dump" drawer.
