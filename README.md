@@ -1,6 +1,6 @@
 # Done– Context Aware Task Manager
 
-Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Memento acts as a **Context-Aware Filter**,  and only showing you what is actionable **right now** based on your location, weather, and energy levels.Done -- an app developed in 48 hours at Polihack v18 in a 5-member team — is a context-aware task manager that filters tasks and notifications to show only what’s actionable based on location, weather, and energy level, hiding 90% of your tasks to reduce cognitive load. We  won 1st place at AppDev category and we were qualified for the *Innovation Labs 2026* national stage.
+Traditional productivity apps act as storage bins for anxiety, showing you everything you haven't done yet. Done — an app developed in 48 hours at Polihack v18 in a 5-member team — is a context-aware task manager that filters tasks and notifications to show only what’s actionable based on location, weather, and energy level, hiding 90% of your tasks to reduce cognitive load. We  won 1st place at AppDev category and we were qualified for the *Innovation Labs 2026* national stage.
 
 > **AppDev Theme:** "Experiencing the world without overwhelming it."
 ---
